@@ -3,16 +3,23 @@
   "version": "1.0.0",
   "description": "This is a TypeScript library that simplifies every step of using Chainlink Automation.",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "repository": "https://github.com/alompson/cartesi-chainlink-js.git",
   "author": "alompson <jp.alonso@usp.br>",
   "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "yarn build"
+  },
+  "files": [
+    "dist"
+  ],
   "dependencies": {
     "@chainlink/contracts": "^0.8.0",
-    "@types/node": "^24.0.10",
-    "ethers": "^5.7.2",
-    "path": "^0.12.7"
+    "ethers": "^5.7.2"
   },
   "devDependencies": {
+    "@types/node": "^20.11.24",
     "typescript": "^5.0.0"
   }
 }
