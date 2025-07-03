@@ -1,0 +1,18 @@
+{
+  "name": "cartesi-chainlink-js",
+  "version": "1.0.0",
+  "description": "This is a TypeScript library that simplifies every step of using Chainlink Automation.",
+  "main": "dist/index.js",
+  "repository": "https://github.com/alompson/cartesi-chainlink-js.git",
+  "author": "alompson <jp.alonso@usp.br>",
+  "license": "MIT",
+  "dependencies": {
+    "@chainlink/contracts": "^0.8.0",
+    "@types/node": "^24.0.10",
+    "ethers": "^5.7.2",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
