@@ -1,7 +1,7 @@
 {
-  "name": "cartesi-chainlink-js",
+  "name": "cartesi-chainlink-lib",
   "version": "1.0.0",
-  "description": "This is a TypeScript library that simplifies every step of using Chainlink Automation.",
+  "description": "The essential toolkit for integrating Chainlink services with the Cartesi ecosystem, starting with Chainlink Automation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "repository": "https://github.com/alompson/cartesi-chainlink-js.git",

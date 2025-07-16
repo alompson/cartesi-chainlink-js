@@ -21,6 +21,7 @@ export interface AutomationConfig {
 export interface CreateUpkeepBaseOptions {
     name: string;
     upkeepContract: string; // The address of the deployed contract to automate
+    encryptedEmail?: string; // Optional, for off-chain notifications. Defaults to '0x' if not provided
     gasLimit: number;
     initialFunds: string; // e.g., '10.0' for 10 LINK
     checkData?: string;
@@ -49,39 +50,6 @@ export interface CreateCustomUpkeepOptions extends CreateUpkeepBaseOptions {
  */
 export type CreateUpkeepOptions = CreateLogUpkeepOptions | CreateCustomUpkeepOptions;
 
-
-// =================================================================
-// SECTION 2: Interfaces for OFF-CHAIN actions (e.g., generating .sol files)
-// Used by the `generateCompatibleContract` function.
-// =================================================================
-
-/**
- * The base set of options for generating the source code of a compatible contract.
- */
-interface GenerateContractBaseOptions {
-    performLogic: string; // The raw Solidity code to inject into performUpkeep()
-}
-
-/**
- * Options for generating a CUSTOM LOGIC contract.
- */
-export interface GenerateCustomLogicContractOptions extends GenerateContractBaseOptions {
-    triggerType: 'custom';
-    checkLogic: string; // The raw Solidity for the conditional check
-}
-
-/**
- * Options for generating a LOG TRIGGER contract.
- */
-export interface GenerateLogContractOptions extends GenerateContractBaseOptions {
-    triggerType: 'log';
-    // No checkLogic needed, as the event is the trigger
-}
-
-/**
- * A combined type used by the public `generateCompatibleContract` function.
- */
-export type GenerateContractOptions = GenerateCustomLogicContractOptions | GenerateLogContractOptions;
 
 /**
  * Represents the information about an upkeep that has been registered on-chain.

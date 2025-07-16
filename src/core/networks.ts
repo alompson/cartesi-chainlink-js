@@ -7,7 +7,7 @@ import { ContractInterface } from 'ethers';
 // The configuration below will then select the correct one for each network.
 
 import AutomationRegistrarV2_1_ABI from '@chainlink/contracts/abi/v0.8/AutomationRegistrar2_1.json';
-import AutomationRegistryV2_1_ABI from '@chainlink/contracts/abi/v0.8/KeeperRegistry2_1.json';
+import AutomationRegistryV2_1_ABI from '@chainlink/contracts/abi/v0.8/KeeperRegistry2_0.json';
 import LinkTokenABI from '@chainlink/contracts/abi/v0.8/LinkTokenInterface.json';
 
 
