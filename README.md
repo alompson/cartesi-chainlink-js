@@ -14,6 +14,8 @@ This library supports the two primary trigger types:
 -   **Custom Logic (`custom`):** The network checks your contract on every new block. Your `checkUpkeep` function contains custom logic (e.g., checking if a certain amount of time has passed) to tell the network when to run the upkeep.
 -   **Log Trigger (`log`):** The network listens for a specific event (a log) to be emitted from a contract you specify. When the event is detected, it triggers your upkeep.
 
+For more in-depth information, please refer to the [official Chainlink Automation documentation](https://docs.chain.link/chainlink-automation).
+
 ## Prerequisites
 
 Before using this library, you will need:
