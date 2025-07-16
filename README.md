@@ -6,6 +6,25 @@ This library simplifies all interactions with the Chainlink Automation registry,
 
 While the library is generic, it includes specific, production-ready smart contract examples for integrating Chainlink Automation with **Cartesi dApps**.
 
+## Understanding Chainlink Automation
+
+Chainlink Automation is a decentralized service that allows you to run your smart contract's functions based on triggers you define. An **Upkeep** is the name for the automated job you register with the network. A decentralized network of nodes (Keepers) earns rewards by reliably monitoring your upkeep's conditions and submitting transactions to execute it when those conditions are met.
+
+This library supports the two primary trigger types:
+-   **Custom Logic (`custom`):** The network checks your contract on every new block. Your `checkUpkeep` function contains custom logic (e.g., checking if a certain amount of time has passed) to tell the network when to run the upkeep.
+-   **Log Trigger (`log`):** The network listens for a specific event (a log) to be emitted from a contract you specify. When the event is detected, it triggers your upkeep.
+
+## Prerequisites
+
+Before using this library, you will need:
+
+1.  **A Deployed Contract:** An Automation-compatible smart contract deployed on your target network. You can use the contracts in the `/examples` directory as a starting point.
+2.  **The Contract Address:** The address of your deployed compatible contract.
+3.  **A Funded Wallet:** A wallet with a private key or mnemonic that holds:
+    -   Sufficient native currency (e.g., ETH) for transaction gas fees.
+    -   Sufficient LINK tokens to fund your upkeep. All upkeeps are paid for in LINK.
+4.  **An RPC URL:** The URL of a node for your target network (e.g., from Infura, Alchemy, or a public node).
+
 ## Core Features
 
 -   **Programmatic Upkeep Management:** Create, pause, unpause, cancel, and fund upkeeps directly from your code.
