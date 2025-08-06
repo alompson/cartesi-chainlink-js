@@ -1,25 +1,34 @@
 {
   "name": "cartesi-chainlink-lib",
   "version": "1.0.0",
+  "license": "MIT",
   "description": "The essential toolkit for integrating Chainlink services with the Cartesi ecosystem, starting with Chainlink Automation.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "repository": "https://github.com/alompson/cartesi-chainlink-js.git",
-  "author": "alompson <jp.alonso@usp.br>",
-  "license": "MIT",
+  "bin": {
+    "run-local-simulator": "dist/simulator/cli.js"
+  },
   "scripts": {
     "build": "tsc",
-    "prepublishOnly": "yarn build"
+    "prepublishOnly": "yarn build",
+    "start:simulator": "node dist/simulator/cli.js"
   },
   "files": [
     "dist"
   ],
   "dependencies": {
-    "@chainlink/contracts": "^0.8.0",
-    "ethers": "^5.7.2"
+    "@chainlink/contracts": "^1.4.0",
+    "axios": "^1.11.0",
+    "ethers": "^5.7.2",
+    "express": "^5.1.0",
+    "prompts": "^2.4.2",
+    "yargs": "^18.0.0"
   },
   "devDependencies": {
+    "@types/express": "^5.0.3",
     "@types/node": "^20.11.24",
+    "@types/prompts": "^2.4.9",
+    "@types/yargs": "^17.0.33",
     "typescript": "^5.0.0"
   }
 }

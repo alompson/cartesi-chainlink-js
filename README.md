@@ -1,8 +1,8 @@
 # Chainlink Automation Library
 
-A TypeScript library for registering and managing Chainlink Automation upkeeps.
+A TypeScript library for registering and managing Chainlink Automation upkeeps, with a built-in simulator for local development and testing.
 
-This library simplifies all interactions with the Chainlink Automation registry, providing strongly-typed methods for creating, managing, and monitoring your upkeeps.
+This library simplifies all interactions with the Chainlink Automation ecosystem, providing a unified, strongly-typed API for both on-chain and local environments.
 
 While the library is generic, it includes specific, production-ready smart contract examples for integrating Chainlink Automation with **Cartesi dApps**.
 
@@ -16,9 +16,91 @@ This library supports the two primary trigger types:
 
 For more in-depth information, please refer to the [official Chainlink Automation documentation](https://docs.chain.link/chainlink-automation).
 
-## Prerequisites
+---
 
-Before using this library, you will need:
+## Local Testing with the Simulator
+
+For rapid development and integration testing, this library includes a powerful **Local Simulator**. This tool mimics the behavior of the entire Chainlink Automation network on your local machine, allowing you to test your contracts end-to-end without needing a live testnet, faucets, or real LINK tokens.
+
+### How It Works
+
+The local testing environment uses a client-server model:
+1.  **The Simulator Service (The "Engine"):** A background service you run from your terminal. It connects to your local blockchain (like Anvil or Hardhat), listens for blockchain events, and acts as a local "Keeper" to execute your upkeeps.
+2.  **The Library Client (The "Remote Control"):** When you initialize the library in `'local'` mode, your test script communicates with the running simulator service via a simple API, telling it which contracts to watch.
+
+### Getting Started with Local Testing
+
+Follow these steps to test your automation logic locally.
+
+#### 1. Run a Local Blockchain
+In your first terminal, start your preferred local node.
+```bash
+# For Foundry users
+anvil
+
+# For Hardhat users
+npx hardhat node
+```
+
+#### 2. Run the Simulator Service
+In a second terminal, start the simulator service. It will prompt you for the RPC URL and a private key if you don't provide them as arguments.
+```bash
+# This will start the service with interactive prompts
+npx run-local-simulator
+
+# Or, provide arguments directly
+npx run-local-simulator --rpc-url http://127.0.0.1:8545 --private-key 0xac09...
+```
+The service will now be running in the background, waiting for instructions.
+
+#### 3. Write Your Test Script
+In your test script (e.g., using Jest), import and use the library in `'local'` mode.
+
+```typescript
+import { Automation } from 'cartesi-chainlink-lib';
+import { ethers } from 'ethers';
+
+// This test assumes you have already deployed your upkeep contract to the local node.
+const upkeepContractAddress = '0xYOUR_DEPLOYED_UPKEEP_CONTRACT_ADDRESS';
+
+// Connect a signer to your local node
+const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
+const signer = new ethers.Wallet('0xac09...', provider);
+
+// 1. Initialize the library in 'local' mode
+const automation = new Automation({
+    signer,
+    chainId: 31337, // Default local chain ID
+    mode: 'local' 
+});
+
+async function registerLocalUpkeep() {
+    // 2. Register the upkeep with the running simulator service
+    const { upkeepId } = await automation.createUpkeep({
+        name: 'My Local Test Upkeep',
+        upkeepContract: upkeepContractAddress,
+        triggerType: 'custom', // or 'log'
+        gasLimit: 500_000,
+        // Note: `initialFunds` is not required for local mode
+    });
+    console.log(`Upkeep registered locally with ID: ${upkeepId}`); // ID is the contract address
+
+    // 3. Your test logic can now proceed...
+    // The simulator will automatically call performUpkeep when conditions are met.
+}
+
+registerLocalUpkeep();
+```
+
+---
+
+## On-Chain Usage (Testnet/Mainnet)
+
+This section describes how to use the library to interact with the live Chainlink Automation network.
+
+### Prerequisites
+
+Before using this library against a live network, you will need:
 
 1.  **A Deployed Contract:** An Automation-compatible smart contract deployed on your target network. You can use the contracts in the `/examples` directory as a starting point.
 2.  **The Contract Address:** The address of your deployed compatible contract.
@@ -27,50 +109,17 @@ Before using this library, you will need:
     -   Sufficient LINK tokens to fund your upkeep. All upkeeps are paid for in LINK.
 4.  **An RPC URL:** The URL of a node for your target network (e.g., from Infura, Alchemy, or a public node).
 
-## Core Features
+### Core Features
 
 -   **Programmatic Upkeep Management:** Create, pause, unpause, cancel, and fund upkeeps directly from your code.
 -   **Strongly-Typed:** A full suite of TypeScript interfaces for all contract options and return values.
--   **Cartesi-Ready Examples:** Production-grade smart contract examples for the most common Cartesi automation patterns.
+-   **Built-in Local Simulator:** Test your entire automation flow without leaving your local environment.
+-   **Cartesi-Ready Examples:** Smart contract examples for the most common Cartesi automation patterns.
 -   **Log & Custom Logic Support:** Full support for both `custom` logic (including time-based) and `log`-triggered upkeeps.
 
----
+### Example: Registering an On-Chain Upkeep
 
-## How to Use with Cartesi
-
-This library is ideal for automating tasks related to a Cartesi dApp. We provide two main blueprint contracts in the `/examples` directory.
-
-### Pattern 1: Triggering a Cartesi dApp on a Schedule
-
--   **Goal:** Periodically send an input to your Cartesi dApp to trigger a scheduled task.
--   **Example:** Use `examples/CartesiAutomator.sol`. This contract uses a time-based custom logic trigger. Its `performUpkeep` function calls the `InputBox.addInput()` function, kicking off your off-chain computation.
-
-### Pattern 2: Reacting to Cartesi Inputs via Logs
-
--   **Goal:** Have an on-chain contract react when a new input is sent to your Cartesi dApp.
--   **Example:** Use `examples/LogTriggeredInputTracker.sol`. This contract uses a log trigger, listening for the `InputAdded` event from the Cartesi `InputBox`. This is the most efficient way to create a responsive, event-driven on-chain component for your dApp.
-
----
-
-## Getting Started
-
-### 1. Choose an Example and Deploy
-
-Copy the example contract that fits your use case from the `/examples` directory and deploy it to your target network.
-
-### 2. Use the Library to Register Your Upkeep
-
-#### Installation
-
-```bash
-npm install cartesi-chainlink-lib
-# or
-yarn add cartesi-chainlink-lib
-```
-
-#### Example: Registering a Log-Triggered Upkeep
-
-This example registers the `LogTriggeredInputTracker` to listen for `InputAdded` events from the Cartesi `InputBox`.
+This example registers the `LogTriggeredInputTracker` to listen for `InputAdded` events from the Cartesi `InputBox` on a live network like Sepolia.
 
 ```typescript
 import { Automation } from 'cartesi-chainlink-lib';
@@ -80,6 +129,7 @@ const provider = new ethers.providers.JsonRpcProvider('YOUR_RPC_URL');
 const signer = new ethers.Wallet('YOUR_PRIVATE_KEY', provider);
 const chainId = 11155111; // Sepolia
 
+// Initialize in the default 'chainlink' mode
 const automation = new Automation({ signer, chainId });
 
 // The official Cartesi InputBox address for your network

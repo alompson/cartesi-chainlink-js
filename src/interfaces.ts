@@ -12,6 +12,7 @@ import { Signer } from 'ethers';
 export interface AutomationConfig {
     signer: Signer;
     chainId: number;
+    mode?: 'chainlink' | 'local'; // Defaults to 'chainlink' if not provided
 }
 
 /**
@@ -49,6 +50,20 @@ export interface CreateCustomUpkeepOptions extends CreateUpkeepBaseOptions {
  * A combined type used by the public `createUpkeep` function.
  */
 export type CreateUpkeepOptions = CreateLogUpkeepOptions | CreateCustomUpkeepOptions;
+
+
+/**
+ * The core interface for an Automation provider. This defines the contract
+ * for how the main `Automation` class interacts with different underlying services.
+ */
+export interface IAutomationProvider {
+    createUpkeep(options: CreateUpkeepOptions): Promise<{ upkeepId: string }>;
+    getUpkeep(upkeepId: string): Promise<UpkeepInfo>;
+    addFunds(upkeepId: string, amount: string): Promise<void>;
+    pauseUpkeep(upkeepId: string): Promise<void>;
+    unpauseUpkeep(upkeepId: string): Promise<void>;
+    cancelUpkeep(upkeepId: string): Promise<void>;
+}
 
 
 /**
