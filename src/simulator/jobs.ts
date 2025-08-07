@@ -8,12 +8,12 @@ const CustomLogicABI = [
 
 // A combined ABI that includes both the legacy and modern log automation interfaces.
 const CombinedLogAutomationABI = [
-    // Modern ILogAutomation
-    "function checkLog(tuple(address source, bytes32[] topics, bytes data) calldata log, bytes memory checkData) external returns (bool upkeepNeeded, bytes memory performData)",
-    // Legacy AutomationCompatibleInterface
-    "function checkUpkeep(bytes calldata checkData) external view returns (bool upkeepNeeded, bytes memory performData)",
-    // Common function
-    "function performUpkeep(bytes calldata performData) external"
+  // Modern ILogAutomation with the full 8-field tuple
+  "function checkLog((uint256 index,uint256 timestamp,bytes32 txHash,uint256 blockNumber,bytes32 blockHash,address source,bytes32[] topics,bytes data) log, bytes checkData) external view returns (bool upkeepNeeded, bytes performData)",
+  // Legacy AutomationCompatibleInterface
+  "function checkUpkeep(bytes calldata checkData) external view returns (bool upkeepNeeded, bytes memory performData)",
+  // Common
+  "function performUpkeep(bytes calldata performData) external",
 ];
 
 
@@ -116,7 +116,11 @@ export class LogTriggerJob implements IUpkeepJob {
                 };
                 
                 // For checkLog, the second argument `checkData` is typically empty.
-                [upkeepNeeded, performData] = await this._upkeepContract.checkLog(logStruct, "0x");
+                console.log('> [DEBUG] start checkLog');
+                const result = await this._upkeepContract.callStatic.checkLog(logStruct, "0x");
+                upkeepNeeded = result.upkeepNeeded;
+                performData   = result.performData;                
+                console.log('> [DEBUG] checkLog result =', [upkeepNeeded, performData]);
                 
             } catch (e: any) {
                 if (e.code === 'INVALID_ARGUMENT' || e.message.includes('checkLog is not a function')) {
@@ -134,6 +138,9 @@ export class LogTriggerJob implements IUpkeepJob {
             }
 
             if (upkeepNeeded) {
+                console.log('> [DEBUG] gasLimit override =', this._options.gasLimit);
+                console.log('> [DEBUG] performData =', performData);
+
                 const tx = await this._upkeepContract.performUpkeep(performData, { gasLimit: this._options.gasLimit });
                 const receipt = await tx.wait();
                 console.log(`[LogTriggerJob - ${this._options.name}] 🎉 Upkeep performed! Tx: ${receipt.transactionHash}`);
