@@ -6,14 +6,24 @@ export default tseslint.config(
   {
     ignores: ["dist/", "node_modules/", "__mocks__/"],
   },
+  // Apply the recommended TypeScript configurations
+  ...tseslint.configs.recommended,
   {
-    files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       globals: {
         ...globals.node,
         ...globals.jest,
       },
     },
-  },
-  ...tseslint.configs.recommended,
+    rules: {
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        {
+          "argsIgnorePattern": "^_",
+          "varsIgnorePattern": "^_",
+          "caughtErrorsIgnorePattern": "^_"
+        }
+      ]
+    }
+  }
 ); 

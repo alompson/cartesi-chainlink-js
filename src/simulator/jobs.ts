@@ -1,5 +1,5 @@
 import { ethers, Signer, Contract } from 'ethers';
-import { CreateUpkeepOptions, CreateCustomUpkeepOptions, CreateLogUpkeepOptions } from '../interfaces';
+import { CreateCustomUpkeepOptions, CreateLogUpkeepOptions } from '../interfaces';
 
 const CustomLogicABI = [
     "function checkUpkeep(bytes calldata) external view returns (bool upkeepNeeded, bytes memory performData)",
@@ -52,8 +52,9 @@ export class CustomLogicJob implements IUpkeepJob {
                 const receipt = await tx.wait();
                 console.log(`[CustomLogicJob - ${this._options.name}] Upkeep performed! Tx: ${receipt.transactionHash}`);
             }
-        } catch (error: any) {
-            console.error(`[CustomLogicJob - ${this._options.name}] Error during check/perform:`, error.message);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[CustomLogicJob - ${this._options.name}] Error during check/perform:`, errorMessage);
         } finally {
             this._isExecuting = false;
         }
@@ -122,8 +123,10 @@ export class LogTriggerJob implements IUpkeepJob {
                 performData   = result.performData;                
                 console.log('> [DEBUG] checkLog result =', [upkeepNeeded, performData]);
                 
-            } catch (e: any) {
-                if (e.code === 'INVALID_ARGUMENT' || e.message.includes('checkLog is not a function')) {
+            } catch (e: unknown) {
+                const code = (typeof (e as { code?: unknown }).code === 'string') ? (e as { code: string }).code : undefined;
+                const msg = (typeof (e as { message?: unknown }).message === 'string') ? (e as { message: string }).message : '';
+                if (code === 'INVALID_ARGUMENT' || msg.includes('checkLog is not a function')) {
                     // This is likely a legacy contract, fall back to checkUpkeep.
                     console.log(`[LogTriggerJob - ${this._options.name}] 'checkLog' not found, falling back to 'checkUpkeep'.`);
                     const checkData = ethers.utils.defaultAbiCoder.encode(
@@ -147,8 +150,9 @@ export class LogTriggerJob implements IUpkeepJob {
             } else {
                 console.log(`[LogTriggerJob - ${this._options.name}] Log detected, but check function returned false.`);
             }
-        } catch (error: any) {
-            console.error(`[LogTriggerJob - ${this._options.name}] Error during perform:`, error.message);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[LogTriggerJob - ${this._options.name}] Error during perform:`, errorMessage);
         }
     };
 

@@ -1,15 +1,26 @@
-import { ethers, ContractReceipt, Contract, Signer } from 'ethers';
-import { CreateUpkeepOptions, CreateLogUpkeepOptions, UpkeepInfo, IAutomationProvider } from '../interfaces';
+import { ethers, Signer, Contract, ContractReceipt } from 'ethers';
 import { getAutomationNetworkConfig } from '../core/networks';
+import { CreateUpkeepOptions, UpkeepInfo, IAutomationProvider, CreateLogUpkeepOptions } from '../interfaces';
+
+// A map of known error selectors to human-readable messages
+const REVERT_SELECTORS: { [key: string]: string } = {
+    '0x8baa579f': 'Insufficient LINK funds to fulfill the request.',
+    '0x6354999f': 'The upkeep is not active.',
+    '0x0274e761': 'The upkeep is already registered.',
+    '0x514b6c24': 'Permission Denied: The connected wallet is not the admin for this upkeep.',
+    '0x972dda13': 'Upkeep is already paused.',
+    '0x729023c1': 'Upkeep is not paused.',
+    '0xd305a542': 'Upkeep cannot be canceled because it is not paused.',
+    '0xcf89f138': 'Upkeep is already canceled.',
+    '0x263c3324': 'Insufficient LINK funds to perform upkeep.',
+};
 
 export class ChainlinkProvider implements IAutomationProvider {
     private _signer: Signer;
-    private _networkConfig: ReturnType<typeof getAutomationNetworkConfig>;
-    
-    // Private properties to hold the instantiated contract objects
-    private _registrar: Contract;
-    private _registry: Contract;
     private _linkToken: Contract;
+    private _registry: Contract;
+    private _registrar: Contract;
+    private _networkConfig: ReturnType<typeof getAutomationNetworkConfig>;
 
     constructor(signer: Signer, chainId: number) {
         this._signer = signer;
@@ -23,13 +34,13 @@ export class ChainlinkProvider implements IAutomationProvider {
             linkTokenAddress,
             linkTokenAbi,
         } = this._networkConfig;
-        
-        this._registrar = new ethers.Contract(registrarAddress, registrarAbi, this._signer);
-        this._registry = new ethers.Contract(registryAddress, registryAbi, this._signer);
-        this._linkToken = new ethers.Contract(linkTokenAddress, linkTokenAbi, this._signer);
+
+        this._linkToken = new ethers.Contract(linkTokenAddress, linkTokenAbi, signer);
+        this._registry = new ethers.Contract(registryAddress, registryAbi, signer);
+        this._registrar = new ethers.Contract(registrarAddress, registrarAbi, signer);
     }
 
-    async createUpkeep(options: CreateUpkeepOptions): Promise<{ upkeepId: string }> {
+    async createUpkeep(options: CreateUpkeepOptions): Promise<{ upkeepId: string; }> {
         try {
             const fundsInWei = ethers.utils.parseEther(options.initialFunds);
 
@@ -59,8 +70,8 @@ export class ChainlinkProvider implements IAutomationProvider {
             console.log(`✅ Upkeep registered successfully! Upkeep ID: ${upkeepId}`);
 
             return { upkeepId };
-        } catch (error) {
-            this._handleContractError(error);
+        } catch (_error: unknown) {
+            this._handleContractError(_error, 'createUpkeep');
         }
     }
 
@@ -75,8 +86,8 @@ export class ChainlinkProvider implements IAutomationProvider {
                 isPaused: upkeepData.paused,
                 performData: upkeepData.performData,
             };
-        } catch (error) {
-            this._handleContractError(error);
+        } catch (_error: unknown) {
+            this._handleContractError(_error, 'getUpkeep');
         }
     }
 
@@ -93,8 +104,8 @@ export class ChainlinkProvider implements IAutomationProvider {
             const addFundsTx = await this._registry.addFunds(upkeepId, amountInWei);
             await addFundsTx.wait();
             console.log('✅ Funds added successfully!');
-        } catch (error) {
-            this._handleContractError(error);
+        } catch (_error: unknown) {
+            this._handleContractError(_error, 'addFunds');
         }
     }
 
@@ -104,8 +115,8 @@ export class ChainlinkProvider implements IAutomationProvider {
             const tx = await this._registry.pauseUpkeep(upkeepId);
             await tx.wait();
             console.log('✅ Upkeep paused.');
-        } catch (error) {
-            this._handleContractError(error);
+        } catch (_error: unknown) {
+            this._handleContractError(_error, 'pauseUpkeep');
         }
     }
 
@@ -115,8 +126,8 @@ export class ChainlinkProvider implements IAutomationProvider {
             const tx = await this._registry.unpauseUpkeep(upkeepId);
             await tx.wait();
             console.log('✅ Upkeep unpaused and is now active.');
-        } catch (error) {
-            this._handleContractError(error);
+        } catch (_error: unknown) {
+            this._handleContractError(_error, 'unpauseUpkeep');
         }
     }
 
@@ -126,8 +137,9 @@ export class ChainlinkProvider implements IAutomationProvider {
             const tx = await this._registry.cancelUpkeep(upkeepId);
             await tx.wait();
             console.log('✅ Upkeep canceled.');
-        } catch (error) {
-            this._handleContractError(error);
+        } catch (_error: unknown) {
+            // Re-throw with a more descriptive message
+            this._handleContractError(_error, 'cancelUpkeep');
         }
     }
 
@@ -173,50 +185,60 @@ export class ChainlinkProvider implements IAutomationProvider {
                     if (parsedLog.name === eventName) {
                         return parsedLog.args.id.toString();
                     }
-                } catch (error) {
-                    // This log was not the one we were looking for, continue
+                } catch {
+                    // This log might not be from the registry, so we can ignore the error
                 }
             }
         }
-        throw new Error(`Could not find the ${eventName} event in the transaction receipt.`);
+        throw new Error('Could not find the UpkeepRegistered event in the transaction receipt.');
     }
 
-    private _findRevertData(error: any): string | undefined {
-        if (!error) return undefined;
-        if (error.data && typeof error.data === 'string' && error.data.startsWith('0x')) {
-            return error.data;
+    private _findRevertData(error: unknown): string | undefined {
+        if (!error || typeof error !== 'object') return undefined;
+        const err = error as Record<string, unknown>;
+        
+        // Direct data field (e.g., revert data)
+        const data = err.data;
+        if (typeof data === 'string' && data.startsWith('0x')) return data;
+        
+        // Nested provider error
+        if (typeof err.error === 'object' && err.error !== null) {
+            return this._findRevertData(err.error);
         }
-        if (error.error) {
-            return this._findRevertData(error.error);
-        }
-        if (typeof error.body === 'string') {
+        
+        // JSON-RPC body (stringified)
+        if (typeof err.body === 'string') {
             try {
-                const body = JSON.parse(error.body);
-                if (body?.error?.data) {
-                    return body.error.data;
-                }
-            } catch (e) {
-                // Ignore JSON parsing errors
+            const body = JSON.parse(err.body) as { error?: { data?: unknown } };
+            const bd = body?.error?.data;
+            if (typeof bd === 'string') return bd;
+            } catch {
+            // ignore parse errors
             }
         }
         return undefined;
     }
-
-    private _handleContractError(error: any): never {
-        const errorSignatures: { [key: string]: string } = {
-            '0x514b6c24': 'Permission Denied: The connected wallet is not the admin for this upkeep.',
-            '0x972dda13': 'Upkeep is already paused.',
-            '0x729023c1': 'Upkeep is not paused.',
-            '0xd305a542': 'Upkeep cannot be canceled because it is not paused.',
-            '0xcf89f138': 'Upkeep is already canceled.',
-            '0x263c3324': 'Insufficient LINK funds to perform upkeep.',
-        };
-
-        const revertData = this._findRevertData(error);
-
-        if (revertData && errorSignatures[revertData]) {
-            throw new Error(errorSignatures[revertData]);
+      
+    private _handleContractError(error: unknown, context: string): never {
+    // Map known revert selectors first
+    const selector = this._findRevertData(error);
+    if (selector && REVERT_SELECTORS[selector]) {
+        throw new Error(`Error during ${context}: ${REVERT_SELECTORS[selector]}`);
+    }
+    
+    // Fallbacks: reason → message → generic
+    if (error && typeof error === 'object') {
+        const err = error as Record<string, unknown>;
+        const reason = err.reason;
+        if (typeof reason === 'string') {
+        throw new Error(`Error during ${context}: ${reason}`);
         }
-        throw new Error(`An unexpected contract error occurred: ${error.reason || error.message}`);
+        const message = err.message;
+        if (typeof message === 'string') {
+        throw new Error(`Error during ${context}: ${message}`);
+        }
+    }
+    
+    throw new Error(`Error during ${context}: An unknown error occurred`);
     }
 } 

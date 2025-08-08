@@ -4,6 +4,18 @@ import { ChainlinkProvider } from '../src/providers/chainlink.provider';
 import { getAutomationNetworkConfig } from '../src/core/networks';
 import { CreateCustomUpkeepOptions } from '../src/interfaces';
 
+type LinkTokenStub = { address: string; approve: jest.Mock };
+type RegistrarStub = { address: string; registerUpkeep: jest.Mock };
+type RegistryStub = {
+  address: string;
+  getUpkeep: jest.Mock;
+  addFunds: jest.Mock;
+  pauseUpkeep: jest.Mock;
+  unpauseUpkeep: jest.Mock;
+  cancelUpkeep: jest.Mock;
+  interface: { parseLog: jest.Mock };
+};
+
 describe('ChainlinkProvider', () => {
   const chainId = 11155111; // Ethereum Sepolia in our config
   const networkConfig = getAutomationNetworkConfig(chainId);
@@ -15,13 +27,13 @@ describe('ChainlinkProvider', () => {
   } as unknown as Signer;
 
   // Stubs for contracts
-  let stubRegistrar: any;
-  let stubRegistry: any;
-  let stubLinkToken: any;
+  let stubRegistrar: RegistrarStub;
+  let stubRegistry: RegistryStub;
+  let stubLinkToken: LinkTokenStub;
 
   // A fake receipt whose log address matches registryAddress
   const fakeLog = { address: networkConfig.registryAddress, data: '0x' };
-  const fakeReceipt: ContractReceipt = { logs: [fakeLog] } as any;
+  const fakeReceipt = ({ logs: [fakeLog] } as unknown) as ContractReceipt;
 
   // Helper to create a tx stub
   const makeTxStub = (receipt?: ContractReceipt) => ({
@@ -30,7 +42,6 @@ describe('ChainlinkProvider', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-
     // Stub LINK token contract
     stubLinkToken = {
       address: networkConfig.linkTokenAddress,
@@ -67,9 +78,12 @@ describe('ChainlinkProvider', () => {
     };
 
     // Spy on ethers.Contract and cast to jest.Mock to allow mockImplementation
-    const contractSpy = (jest.spyOn(ethers as any, 'Contract') as unknown) as jest.Mock;
+    const contractSpy = jest.spyOn(
+      (ethers as unknown as { Contract: jest.Mock }),
+      'Contract'
+    ) as unknown as jest.Mock;
 
-    contractSpy.mockImplementation((...args: any[]) => {
+    contractSpy.mockImplementation((...args: unknown[]) => {
       const address = args[0] as string;
       if (address === networkConfig.registrarAddress) return stubRegistrar;
       if (address === networkConfig.registryAddress) return stubRegistry;
@@ -83,12 +97,17 @@ describe('ChainlinkProvider', () => {
   });
 
   it('constructor instantiates three contracts with correct addresses', () => {
-    const contractMock = (ethers as any).Contract as jest.Mock;
+    // Use (ethers as any).Contract as a Jest mock
+    const contractMock = (ethers as unknown as { Contract: jest.Mock }).Contract as jest.Mock;
+
     new ChainlinkProvider(fakeSigner, chainId);
-    expect(contractMock.mock.calls.length).toBe(3);
-    expect(contractMock.mock.calls[0][0]).toBe(networkConfig.registrarAddress);
-    expect(contractMock.mock.calls[1][0]).toBe(networkConfig.registryAddress);
-    expect(contractMock.mock.calls[2][0]).toBe(networkConfig.linkTokenAddress);
+    const calledAddresses = contractMock.mock.calls.map(call => call[0]);
+    expect(calledAddresses).toHaveLength(3);
+    expect(calledAddresses).toEqual(expect.arrayContaining([
+      networkConfig.registrarAddress,
+      networkConfig.registryAddress,
+      networkConfig.linkTokenAddress,
+    ]));
   });
 
   it('createUpkeep calls approve and registerUpkeep and parses upkeepId', async () => {
@@ -153,17 +172,16 @@ describe('ChainlinkProvider', () => {
     expect(stubRegistry.cancelUpkeep).toHaveBeenCalledWith('ID3');
   });
 
-  it('_handleContractError maps known and unknown errors', () => {
-    const provider = new ChainlinkProvider(fakeSigner, chainId) as any;
-
-    // Known signature
+  it('_handleContractError maps known and unknown errors correctly', () => {
+    const providerPriv = new ChainlinkProvider(fakeSigner, chainId) as unknown as {
+      _handleContractError: (e: unknown, c: string) => never;
+    };
     expect(() =>
-      provider._handleContractError({ data: '0x514b6c24' })
+      providerPriv._handleContractError({ data: '0x514b6c24' }, 'pauseUpkeep')
     ).toThrow('Permission Denied: The connected wallet is not the admin for this upkeep.');
 
-    // Unknown error
     expect(() =>
-      provider._handleContractError(new Error('random failure'))
-    ).toThrow('An unexpected contract error occurred: random failure');
+      providerPriv._handleContractError(new Error('random failure'), 'test')
+    ).toThrow('Error during test: random failure');
   });
 });

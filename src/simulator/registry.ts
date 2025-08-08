@@ -24,26 +24,33 @@ export class UpkeepRegistry {
             throw new Error(`Upkeep for contract ${contractAddress} is already registered.`);
         }
 
-        let job: IUpkeepJob;
+        try {
+            console.log(`[Registry] Registering upkeep: ${options.name}`);
 
-        // Instantiate the correct job type based on the trigger
-        if (options.triggerType === 'custom') {
-            job = new CustomLogicJob(options as CreateCustomUpkeepOptions, this._signer);
-        } else if (options.triggerType === 'log') {
-            // Add validation for log-specific options
-            const logOptions = options as CreateLogUpkeepOptions;
-            if (!logOptions.logEmitterAddress || !logOptions.logEventSignature) {
-                throw new Error("For log triggers, 'logEmitterAddress' and 'logEventSignature' are required.");
+            let job: IUpkeepJob;
+            if (options.triggerType === 'custom') {
+                job = new CustomLogicJob(options as CreateCustomUpkeepOptions, this._signer);
+            } else if (options.triggerType === 'log') {
+                // Add validation for log-specific options
+                const logOptions = options as CreateLogUpkeepOptions;
+                if (!logOptions.logEmitterAddress || !logOptions.logEventSignature) {
+                    throw new Error("For log triggers, 'logEmitterAddress' and 'logEventSignature' are required.");
+                }
+                job = new LogTriggerJob(logOptions, this._signer);
+            } else {
+                throw new Error(`Unsupported trigger type: ${(options as unknown as { triggerType: string }).triggerType}`);
             }
-            job = new LogTriggerJob(logOptions, this._signer);
-        } else {
-            throw new Error(`Unsupported trigger type: ${(options as any).triggerType}`);
-        }
 
-        this._jobs.set(contractAddress, job);
-        job.start();
-        
-        console.log(`[Registry] Successfully registered and started job for ${options.name}`);
+            this._jobs.set(contractAddress, job);
+            job.start();
+            
+            console.log(`[Registry] Successfully registered and started job for ${options.name}`);
+        } catch (error: unknown) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error(`[Registry] Failed to register upkeep for ${options.name}:`, errorMessage);
+            // Re-throw to ensure the caller (e.g., the server) knows about the failure.
+            throw error;
+        }
     }
 
     public unregisterUpkeep(contractAddress: string): void {
