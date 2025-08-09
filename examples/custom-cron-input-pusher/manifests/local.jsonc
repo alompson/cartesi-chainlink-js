@@ -1,0 +1,30 @@
+{
+    // Runs fully locally using your simulator and a local chain (Anvil/Hardhat).
+    "version": "1",
+    "network": {
+      "mode": "local",
+      "chainId": 31337
+    },
+    "deployment": {
+      // Build artifact for InputPusherCron; produce with your chosen tool (Hardhat/Foundry).
+      "artifact": "./artifacts/InputPusherCron.json",
+      "constructorArgs": [
+        // 1) InputBox address on local chain (deploy your own local InputBox first)
+        "0xINPUT_BOX_LOCAL",
+        // 2) The target dApp address; for the demo we pass a Counter address or your dApp
+        "0xAPP_CONTRACT_LOCAL",
+        // 3) interval in seconds (e.g., 15)
+        15,
+        // 4) payload (hex string)
+        "0x68656c6c6f2d63617274657369"
+      ]
+    },
+    "registration": {
+      "name": "Cartesi Input Pusher (Local)",
+      "upkeepContract": "auto",          // auto means: use the freshly deployed address
+      "gasLimit": 300000,
+      "triggerType": "custom"            // time-based / custom logic
+      // initialFunds is not required in local mode
+    }
+  }
+  

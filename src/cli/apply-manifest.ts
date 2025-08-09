@@ -1,6 +1,7 @@
 import { ethers } from 'ethers';
 import fs from 'fs';
 import path from 'path';
+import { parse } from 'jsonc-parser';
 import { Automation } from '../automation.js';
 import { CreateUpkeepOptions } from '../interfaces.js';
 import { ManifestSchema, type Manifest, type State } from '../manifest/schema.js';
@@ -25,7 +26,7 @@ export async function applyManifest(filePath: string, wallet: ethers.Wallet): Pr
   let rawManifest: unknown;
   try {
     const manifestContent = fs.readFileSync(filePath, 'utf8');
-    rawManifest = JSON.parse(manifestContent);
+    rawManifest = parse(manifestContent);
   } catch (error) {
     throw new Error(`Failed to parse manifest file: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -137,7 +138,7 @@ export async function applyManifest(filePath: string, wallet: ethers.Wallet): Pr
   console.log(`📍 Contract: ${upkeepContract}`);
 
   // Write state file
-  const stateFilePath = filePath.replace(/\.json$/, '.state.json');
+  const stateFilePath = filePath.replace(/\.jsonc?$/, '.state.json');
   const state: State = {
     address: upkeepContract as string,
     upkeepId,
