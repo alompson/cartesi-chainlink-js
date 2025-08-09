@@ -22,7 +22,7 @@ export async function applyManifest(filePath: string, wallet: ethers.Wallet): Pr
   }
 
   // Read and parse manifest
-  let rawManifest: any;
+  let rawManifest: unknown;
   try {
     const manifestContent = fs.readFileSync(filePath, 'utf8');
     rawManifest = JSON.parse(manifestContent);
@@ -34,10 +34,11 @@ export async function applyManifest(filePath: string, wallet: ethers.Wallet): Pr
   let manifest: Manifest;
   try {
     manifest = ManifestSchema.parse(rawManifest);
-  } catch (error: any) {
-    const errorMessage = error.errors 
-      ? error.errors.map((err: any) => `${err.path.join('.')}: ${err.message}`).join(', ')
-      : error.message;
+  } catch (error: unknown) {
+    const zodError = error as { errors?: Array<{ path: Array<string | number>; message: string }> };
+    const errorMessage = zodError.errors 
+      ? zodError.errors.map((err) => `${err.path.join('.')}: ${err.message}`).join(', ')
+      : error instanceof Error ? error.message : String(error);
     throw new Error(`Invalid manifest: ${errorMessage}`);
   }
 

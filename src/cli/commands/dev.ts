@@ -126,7 +126,7 @@ async function handleDevStatus(args: DevStatusArgs): Promise<void> {
     } else {
       console.log(`❌ Simulator is not responding (HTTP ${response.status})`);
     }
-  } catch (error) {
+  } catch (_error) {
     console.log(`❌ Simulator is not running on port ${port}`);
     console.log(`💡 Start it with: cartesi-chainlink dev start`);
   }

@@ -1,5 +1,6 @@
 export default {
-  preset: 'ts-jest',
+  preset: 'ts-jest/presets/default-esm',
+  extensionsToTreatAsEsm: ['.ts'],
   testEnvironment: 'node',
   collectCoverage: true,
   coverageDirectory: 'coverage',
@@ -7,6 +8,10 @@ export default {
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
     '^@chainlink/contracts/abi/v0.8/(.*)$': '<rootDir>/__mocks__/@chainlink/contracts/index.js',
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
   setupFilesAfterEnv: ['jest-extended/all'],
+  transform: {
+    '^.+\\.ts$': ['ts-jest', { useESM: true }],
+  },
 }; 

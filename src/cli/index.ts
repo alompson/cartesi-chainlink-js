@@ -65,7 +65,7 @@ async function handleApplyCommand(args: ApplyCommandArgs): Promise<void> {
 }
 
 async function main(): Promise<void> {
-  const argv = await yargs(hideBin(process.argv))
+  await yargs(hideBin(process.argv))
     .scriptName('chainlink-upkeeps')
     .usage('$0 <command> [options]')
     .command(

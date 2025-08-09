@@ -1,12 +1,11 @@
 import { ethers } from 'ethers';
 import fs from 'fs';
-import path from 'path';
 
 /**
  * Contract artifact structure expected from Hardhat/Foundry compilation
  */
 interface ContractArtifact {
-  abi: any[];
+  abi: ethers.ContractInterface;
   bytecode?: string;
   evm?: {
     bytecode: {
@@ -22,7 +21,7 @@ export interface DeploymentOptions {
   wallet: ethers.Wallet;
   artifactPath?: string;
   template?: string;
-  constructorArgs?: any[];
+  constructorArgs?: unknown[];
 }
 
 /**
@@ -129,7 +128,7 @@ export function validateArtifactPath(filePath: string): void {
 
   try {
     fs.accessSync(filePath, fs.constants.R_OK);
-  } catch (error) {
+  } catch (_error) {
     throw new Error(`Artifact file is not readable: ${filePath}`);
   }
 } 

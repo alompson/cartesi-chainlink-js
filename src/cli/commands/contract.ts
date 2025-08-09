@@ -48,11 +48,12 @@ async function handleContractDeploy(args: ContractDeployArgs): Promise<void> {
     console.log(`🚀 Deploying contract from artifact: ${artifact}`);
     
     // Parse constructor arguments
-    let parsedArgs: any[] = [];
+    let parsedArgs: unknown[] = [];
     if (constructorArgs) {
       try {
         // Try to parse as JSON array first
-        parsedArgs = JSON.parse(constructorArgs);
+        const parsed = JSON.parse(constructorArgs);
+        parsedArgs = Array.isArray(parsed) ? parsed : [parsed];
       } catch {
         // If that fails, split by comma and trim
         parsedArgs = constructorArgs.split(',').map(arg => arg.trim());
@@ -93,7 +94,7 @@ async function handleContractVerify(args: ContractVerifyArgs): Promise<void> {
     
     // Create wallet and provider
     const provider = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
-    const wallet = new ethers.Wallet(privateKey, provider);
+    const _wallet = new ethers.Wallet(privateKey, provider);
 
     // Check if contract exists
     const code = await provider.getCode(address);
@@ -104,8 +105,8 @@ async function handleContractVerify(args: ContractVerifyArgs): Promise<void> {
     console.log(`✅ Contract exists at address: ${address}`);
 
     // Try to detect contract type by checking for known function signatures
-    const automationCompatibleSelector = '0x6e04ff0d'; // checkUpkeep(bytes)
-    const logAutomationSelector = '0x53596dcd'; // checkLog((uint256,uint256,bytes32,uint256,bytes32,address,bytes32[],bytes),bytes)
+    const _automationCompatibleSelector = '0x6e04ff0d'; // checkUpkeep(bytes)
+    const _logAutomationSelector = '0x53596dcd'; // checkLog((uint256,uint256,bytes32,uint256,bytes32,address,bytes32[],bytes),bytes)
 
     try {
       // Create a basic contract instance to test function existence

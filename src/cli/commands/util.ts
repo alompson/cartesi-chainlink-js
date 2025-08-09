@@ -101,11 +101,11 @@ async function handleUtilInit(args: UtilInitArgs): Promise<void> {
     console.log(`   Network: ${network}`);
 
     // Select template based on type and network
-    let template: any;
+    let template: { network: { chainId: number; mode: string }; [key: string]: unknown };
     if (network === 'local') {
-      template = type === 'log' ? LOG_TRIGGER_TEMPLATE : CUSTOM_TRIGGER_TEMPLATE;
+      template = JSON.parse(JSON.stringify(type === 'log' ? LOG_TRIGGER_TEMPLATE : CUSTOM_TRIGGER_TEMPLATE));
     } else {
-      template = type === 'log' ? CHAINLINK_LOG_TEMPLATE : CHAINLINK_CUSTOM_TEMPLATE;
+      template = JSON.parse(JSON.stringify(type === 'log' ? CHAINLINK_LOG_TEMPLATE : CHAINLINK_CUSTOM_TEMPLATE));
       // Update chainId for common networks
       if (network === 'mainnet') template.network.chainId = 1;
       else if (network === 'arbitrum') template.network.chainId = 42161;
@@ -168,7 +168,7 @@ async function handleUtilValidate(args: UtilValidateArgs): Promise<void> {
     }
 
     // Read and parse the file
-    let rawManifest: any;
+    let rawManifest: unknown;
     try {
       const content = fs.readFileSync(file, 'utf8');
       rawManifest = JSON.parse(content);
@@ -246,16 +246,18 @@ async function handleUtilValidate(args: UtilValidateArgs): Promise<void> {
 
       console.log(`\n🎉 Validation completed successfully!`);
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.log(`❌ Manifest validation failed:`);
       
-      if (error.errors) {
+      const zodError = error as { errors?: Array<{ path: Array<string | number>; message: string }> };
+      if (zodError.errors) {
         // Zod validation errors
-        for (const err of error.errors) {
+        for (const err of zodError.errors) {
           console.log(`   ${err.path.join('.')}: ${err.message}`);
         }
       } else {
-        console.log(`   ${error.message}`);
+        const message = error instanceof Error ? error.message : String(error);
+        console.log(`   ${message}`);
       }
       
       console.log(`\n💡 Fix the issues above and run validation again.`);

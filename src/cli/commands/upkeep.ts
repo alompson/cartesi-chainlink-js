@@ -180,7 +180,7 @@ async function handleUpkeepRegister(args: UpkeepRegisterArgs): Promise<void> {
   }
 }
 
-async function handleUpkeepList(args: UpkeepListArgs): Promise<void> {
+async function handleUpkeepList(_args: UpkeepListArgs): Promise<void> {
   try {
     console.log(`📋 Listing upkeeps...`);
     
@@ -297,7 +297,7 @@ function findStateFiles(dir: string): string[] {
         files.push(fullPath);
       }
     }
-  } catch (error) {
+  } catch (_error) {
     // Ignore directories we can't read
   }
   
