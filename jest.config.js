@@ -7,8 +7,8 @@ export default {
   coverageProvider: 'v8',
   testMatch: ['**/__tests__/**/*.test.ts'],
   moduleNameMapper: {
-    '^@chainlink/contracts/abi/v0.8/(.*)$': '<rootDir>/__mocks__/@chainlink/contracts/index.js',
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    '^@chainlink/contracts/(.*)$': '<rootDir>/__mocks__/@chainlink/contracts/index.js'
   },
   setupFilesAfterEnv: ['jest-extended/all'],
   transform: {

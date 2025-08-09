@@ -1,1 +1,2 @@
-module.exports = { abi: [] };
+// __mocks__/@chainlink/contracts/index.js
+export const abi = [];
