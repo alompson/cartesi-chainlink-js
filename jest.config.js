@@ -12,6 +12,14 @@ export default {
   },
   setupFilesAfterEnv: ['jest-extended/all'],
   transform: {
-    '^.+\\.ts$': ['ts-jest', { useESM: true }],
+    '^.+\\.ts$': ['ts-jest', { 
+      useESM: true,
+      tsconfig: {
+        module: 'ESNext'
+      }
+    }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(axios)/)'
+  ],
 }; 

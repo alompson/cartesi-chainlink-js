@@ -1,11 +1,18 @@
 
+import { jest } from '@jest/globals';
 import { BigNumber, ethers, Signer, ContractReceipt } from 'ethers';
 import { ChainlinkProvider } from '../src/providers/chainlink.provider';
 import { getAutomationNetworkConfig } from '../src/core/networks';
 import { CreateCustomUpkeepOptions } from '../src/interfaces';
 
-type LinkTokenStub = { address: string; approve: jest.Mock };
-type RegistrarStub = { address: string; registerUpkeep: jest.Mock };
+type LinkTokenStub = { 
+  address: string; 
+  approve: jest.Mock;
+};
+type RegistrarStub = { 
+  address: string; 
+  registerUpkeep: jest.Mock;
+};
 type RegistryStub = {
   address: string;
   getUpkeep: jest.Mock;
