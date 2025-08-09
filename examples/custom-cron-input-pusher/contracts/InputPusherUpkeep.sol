@@ -1,41 +1,17 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.18;
 
-import {
-    AutomationCompatibleInterface
-} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
+import { IInputBox } from "../../IInputBox.sol";
 
-/**
- * Minimal InputBox interface (only what we call).
- * On mainnet/testnet you will point to the official deployed InputBox;
- * locally you can deploy Cartesi's reference InputBox or a compatible mock.
- */
-interface IInputBox {
-    function addInput(address appContract, bytes calldata payload) external returns (bytes32);
-}
-
-/**
- * @title InputPusherCron
- * @notice A "custom logic" (time-based) upkeep that periodically calls InputBox.addInput
- *         for a specific Cartesi dApp (appContract). This is the canonical “cron-like” pattern.
- *
- * Chainlink expectations (guidelines):
- * - checkUpkeep must be view and cheap; it only decides whether to run performUpkeep.
- * - performUpkeep should not re-check complex conditions; it executes and updates state.
- * - Use an interval and a lastTimeStamp to avoid over-execution and race conditions.
- */
-contract InputPusherCron is AutomationCompatibleInterface {
-    error NotReady();
-
+/// @notice This upkeep periodically sends a fixed payload to a given dApp via the InputBox.
+/// @dev Designed for time-based Chainlink Automation (custom trigger type).
+contract InputPusherCron {
     IInputBox public immutable inputBox;
-    address  public immutable appContract;
-
-    // Simple time-based cadence
+    address public immutable appContract;
     uint256 public immutable interval;
-    uint256 public lastTimeStamp;
-
-    // Example payload producer; keep it small. In production this may be dynamic/off-chain assembled.
     bytes public payload;
+
+    uint256 public lastTimestamp;
 
     constructor(
         address _inputBox,
@@ -43,39 +19,27 @@ contract InputPusherCron is AutomationCompatibleInterface {
         uint256 _interval,
         bytes memory _payload
     ) {
-        require(_inputBox != address(0), "inputBox=0");
-        require(_appContract != address(0), "appContract=0");
-        require(_interval > 0, "interval=0");
-
-        inputBox     = IInputBox(_inputBox);
-        appContract  = _appContract;
-        interval     = _interval;
-        lastTimeStamp = block.timestamp;
-        payload      = _payload;
+        inputBox = IInputBox(_inputBox);
+        appContract = _appContract;
+        interval = _interval;
+        payload = _payload;
+        lastTimestamp = block.timestamp;
     }
 
-    function setPayload(bytes calldata newPayload) external {
-        // add real access control in production
-        payload = newPayload;
-    }
-
-    // Off-chain check: is it time yet?
-    function checkUpkeep(bytes calldata /*checkData*/)
+    /// @notice Called off-chain by Chainlink nodes to decide if upkeep should run.
+    function checkUpkeep(bytes calldata)
         external
         view
-        override
-        returns (bool upkeepNeeded, bytes memory performData)
+        returns (bool upkeepNeeded, bytes memory)
     {
-        upkeepNeeded = (block.timestamp - lastTimeStamp) >= interval;
-        performData = ""; // not needed here
+        upkeepNeeded = (block.timestamp - lastTimestamp) >= interval;
+        return (upkeepNeeded, bytes(""));
     }
 
-    // On-chain execution: push input into InputBox
-    function performUpkeep(bytes calldata /*performData*/) external override {
-        if ((block.timestamp - lastTimeStamp) < interval) revert NotReady();
-        lastTimeStamp = block.timestamp;
-
-        // Minimal input to demonstrate the flow
+    /// @notice Called on-chain by Chainlink nodes to execute the upkeep.
+    function performUpkeep(bytes calldata) external {
+        require((block.timestamp - lastTimestamp) >= interval, "Too soon");
+        lastTimestamp = block.timestamp;
         inputBox.addInput(appContract, payload);
     }
 }

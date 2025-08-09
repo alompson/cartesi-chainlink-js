@@ -1,0 +1,30 @@
+{
+    // This manifest deploys InputBoxLogCounter on Sepolia and registers it as a log-triggered upkeep with Chainlink.
+    "version": "1",
+    "network": {
+      "mode": "chainlink",
+      "chainId": 11155111
+    },
+    "deployment": {
+      "artifact": "./artifacts/InputBoxLogCounter.json",
+      "constructorArgs": [
+        // Replace with the official InputBox on Sepolia
+        "0xINPUT_BOX_SEPOLIA",
+        // Your dApp address on Sepolia; only inputs for this appContract count
+        "0xAPP_CONTRACT_SEPOLIA",
+        // Your Counter contract on Sepolia (deploy separately with `cartesi-chainlink contract deploy`)
+        "0xCOUNTER_SEPOLIA"
+      ]
+    },
+    "registration": {
+      "name": "InputBox → Counter (Sepolia)",
+      "upkeepContract": "auto",
+      "gasLimit": 250000,
+      "triggerType": "log",
+      "initialFunds": "5.0",
+      // Log filter wired to InputBox + InputAdded signature
+      "logEmitterAddress": "0xINPUT_BOX_SEPOLIA",
+      "logEventSignature": "InputAdded(address,uint256,bytes)"
+    }
+  }
+  

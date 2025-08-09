@@ -1,0 +1,30 @@
+{
+    // This manifest deploys InputPusherCron to Sepolia and registers it with Chainlink.
+    "version": "1",
+    "network": {
+      "mode": "chainlink",
+      "chainId": 11155111
+    },
+    "deployment": {
+      "artifact": "./artifacts/InputPusherCron.json",
+      "constructorArgs": [
+        // Replace with the official Cartesi InputBox on Sepolia
+        "0xINPUT_BOX_SEPOLIA",
+        // Your dApp address on Sepolia (the app that will receive inputs)
+        "0xAPP_CONTRACT_SEPOLIA",
+        // interval seconds
+        60,
+        // payload (bytes)
+        "0x636172746573692d7365706f6c6961"
+      ]
+    },
+    "registration": {
+      "name": "Cartesi Input Pusher (Sepolia)",
+      "upkeepContract": "auto",
+      "gasLimit": 300000,
+      "triggerType": "custom",
+      // Required by schema for chainlink mode; in LINK units (string)
+      "initialFunds": "5.0"
+    }
+  }
+  

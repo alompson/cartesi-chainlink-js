@@ -1,30 +1,35 @@
 {
-    // Runs fully locally using your simulator and a local chain (Anvil/Hardhat).
+    // This manifest deploys InputPusherCron locally and registers it with the local simulator.
+    // It relies on a locally deployed InputBox and a target appContract that will receive inputs.
     "version": "1",
     "network": {
+      // Mode must be "local" for the simulator client used by the CLI.
       "mode": "local",
+      // Default local chainId used throughout your CLI.
       "chainId": 31337
     },
     "deployment": {
-      // Build artifact for InputPusherCron; produce with your chosen tool (Hardhat/Foundry).
+      // The upkeep contract artifact; apply-manifest resolves this path relative to THIS file.
       "artifact": "./artifacts/InputPusherCron.json",
       "constructorArgs": [
-        // 1) InputBox address on local chain (deploy your own local InputBox first)
+        // address inputBox - local InputBox you deployed yourself
         "0xINPUT_BOX_LOCAL",
-        // 2) The target dApp address; for the demo we pass a Counter address or your dApp
+        // address appContract - the Cartesi dApp address (or demo contract) that will receive inputs
         "0xAPP_CONTRACT_LOCAL",
-        // 3) interval in seconds (e.g., 15)
+        // uint256 interval - seconds between runs
         15,
-        // 4) payload (hex string)
-        "0x68656c6c6f2d63617274657369"
+        // bytes payload - minimal payload that InputBox will carry to your dApp
+        "0x68656c6c6f2d6c6f63616c"
       ]
     },
     "registration": {
       "name": "Cartesi Input Pusher (Local)",
-      "upkeepContract": "auto",          // auto means: use the freshly deployed address
+      // "auto" tells apply-manifest to use the freshly deployed address as upkeepContract
+      "upkeepContract": "auto",
+      // Gas limit used by the simulator when calling performUpkeep
       "gasLimit": 300000,
-      "triggerType": "custom"            // time-based / custom logic
-      // initialFunds is not required in local mode
+      // Custom = time-based / checkUpkeep pattern
+      "triggerType": "custom"
     }
   }
   

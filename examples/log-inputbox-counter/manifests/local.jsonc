@@ -1,0 +1,30 @@
+{
+    // This manifest deploys InputBoxLogCounter locally and registers it as a log-triggered upkeep.
+    // It listens for InputBox.InputAdded(appContract, index, input) and increments a Counter.
+    "version": "1",
+    "network": {
+      "mode": "local",
+      "chainId": 31337
+    },
+    "deployment": {
+      "artifact": "./artifacts/InputBoxLogCounter.json",
+      "constructorArgs": [
+        // address inputBox - local InputBox address (you deploy this separately)
+        "0xINPUT_BOX_LOCAL",
+        // address appContract - only inputs for this appContract are considered by the upkeep
+        "0xAPP_CONTRACT_LOCAL",
+        // address counter - your local Counter contract address (deploy separately)
+        "0xCOUNTER_LOCAL"
+      ]
+    },
+    "registration": {
+      "name": "InputBox → Counter (Local)",
+      "upkeepContract": "auto",
+      "gasLimit": 250000,
+      "triggerType": "log",
+      // The simulator needs these:
+      "logEmitterAddress": "0xINPUT_BOX_LOCAL",
+      "logEventSignature": "InputAdded(address,uint256,bytes)"
+    }
+  }
+  
