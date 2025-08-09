@@ -1,5 +1,5 @@
-import { ethers, Signer, Contract } from 'ethers';
-import { CreateCustomUpkeepOptions, CreateLogUpkeepOptions } from '../interfaces';
+import { ethers, Contract } from 'ethers';
+import { CreateCustomUpkeepOptions, CreateLogUpkeepOptions } from '../interfaces.js';
 
 const CustomLogicABI = [
     "function checkUpkeep(bytes calldata) external view returns (bool upkeepNeeded, bytes memory performData)",
@@ -24,61 +24,85 @@ export interface IUpkeepJob {
 
 export class CustomLogicJob implements IUpkeepJob {
     private _upkeepContract: Contract;
-    private _signer: Signer;
+    private _signer: ethers.Signer;
     private _provider: ethers.providers.Provider;
-    private _isExecuting = false; // A lock to prevent concurrent executions
+    private _isExecuting = false;
+    private _lastProcessedBlock = 0;
+    private _intervalId: NodeJS.Timeout | null = null;
 
-    constructor(private _options: CreateCustomUpkeepOptions, signer: Signer) {
+    constructor(private _options: CreateCustomUpkeepOptions, signer: ethers.Signer) {
         this._signer = signer;
         this._provider = signer.provider!;
-        this._upkeepContract = new ethers.Contract(_options.upkeepContract, CustomLogicABI, this._signer);
+        this._upkeepContract = new Contract(this._options.upkeepContract, CustomLogicABI, this._signer);
     }
 
-    // The handler function that will be called on every new block
-    private _onNewBlock = async (blockNumber: number) => {
+    public async start(): Promise<void> {
+        console.log(`[CustomLogicJob - ${this._options.name}] Starting... Polling for new blocks every second.`);
+        this._lastProcessedBlock = await this._provider.getBlockNumber();
+        console.log(`[CustomLogicJob - ${this._options.name}] Initial block number: ${this._lastProcessedBlock}`);
+        this._intervalId = setInterval(() => this._tick(), 1000);
+    }
+
+    private async _tick(): Promise<void> {
         if (this._isExecuting) {
-            console.log(`[CustomLogicJob - ${this._options.name}] Already executing, skipping block ${blockNumber}.`);
             return;
         }
 
         try {
-            console.log(`[CustomLogicJob - ${this._options.name}] Block ${blockNumber}: Checking upkeep...`);
-            const [upkeepNeeded, performData] = await this._upkeepContract.checkUpkeep("0x");
+            this._isExecuting = true;
+            const currentBlock = await this._provider.getBlockNumber();
+
+            if (currentBlock <= this._lastProcessedBlock) {
+                // No new block to process, this is expected behavior on a non-auto-mining chain
+                // console.log(`[CustomLogicJob - ${this._options.name}] No new block (current: ${currentBlock}, last: ${this._lastProcessedBlock})...`);
+                this._isExecuting = false; // Release lock before returning
+                return;
+            }
+
+            console.log(`[CustomLogicJob - ${this._options.name}] New block ${currentBlock}: Checking upkeep...`);
+            this._lastProcessedBlock = currentBlock;
+
+            const [upkeepNeeded, performData] = await this._upkeepContract.checkUpkeep(this._options.checkData || '0x');
 
             if (upkeepNeeded) {
-                this._isExecuting = true;
                 console.log(`[CustomLogicJob - ${this._options.name}] ✅ Upkeep needed. Performing...`);
-                const tx = await this._upkeepContract.performUpkeep(performData, { gasLimit: this._options.gasLimit });
+                const tx = await this._upkeepContract.performUpkeep(performData);
                 const receipt = await tx.wait();
-                console.log(`[CustomLogicJob - ${this._options.name}] Upkeep performed! Tx: ${receipt.transactionHash}`);
+                console.log(`[CustomLogicJob - ${this._options.name}] 🎉 Upkeep performed! Tx: ${receipt.transactionHash}`);
             }
         } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`[CustomLogicJob - ${this._options.name}] Error during check/perform:`, errorMessage);
+            let errorMessage = 'An unknown error occurred';
+            if (error instanceof Error) {
+                errorMessage = error.message;
+            } else if (typeof error === 'object' && error !== null && 'message' in error) {
+                errorMessage = String((error as {message: unknown}).message);
+            }
+            console.error(`[CustomLogicJob - ${this._options.name}] Error during check/perform: ${errorMessage}`);
+            // For detailed debugging, log the full error object
+            // console.error(error);
         } finally {
             this._isExecuting = false;
         }
-    };
-
-    start(): void {
-        console.log(`[CustomLogicJob - ${this._options.name}] Starting... Listening for new blocks.`);
-        this._provider.on('block', this._onNewBlock);
     }
 
-    stop(): void {
-        console.log(`[CustomLogicJob - ${this._options.name}] Stopping...`);
-        this._provider.off('block', this._onNewBlock);
+    public stop(): void {
+        if (this._intervalId) {
+            clearInterval(this._intervalId);
+            this._intervalId = null;
+        }
+        console.log(`[CustomLogicJob - ${this._options.name}] Stopped.`);
     }
 }
 
 
 export class LogTriggerJob implements IUpkeepJob {
     private _upkeepContract: Contract;
-    private _signer: Signer;
+    private _signer: ethers.Signer;
     private _provider: ethers.providers.Provider;
     private _eventFilter: ethers.EventFilter;
+    private _processedLogs: Set<string> = new Set(); // For deduplication
 
-    constructor(private _options: CreateLogUpkeepOptions, signer: Signer) {
+    constructor(private _options: CreateLogUpkeepOptions, signer: ethers.Signer) {
         this._signer = signer;
         this._provider = signer.provider!;
         // Use the combined ABI to handle both legacy and modern log upkeeps
@@ -93,8 +117,22 @@ export class LogTriggerJob implements IUpkeepJob {
 
     // The handler that will be called ONLY when a matching log is found
     private _onLogDetected = async (log: ethers.providers.Log) => {
-        console.log(`[LogTriggerJob - ${this._options.name}] ✅ Log detected! Preparing to perform upkeep.`);
-        
+        const logId = `${log.transactionHash}-${log.logIndex}`;
+        if (this._processedLogs.has(logId)) {
+            // This is a log we have already seen and processed.
+            return;
+        }
+
+        // Check if the transaction was sent by this simulator's wallet
+        const tx = await this._provider.getTransaction(log.transactionHash);
+        const signerAddress = await this._signer.getAddress();
+        if (tx && tx.from === signerAddress) {
+            console.log(`[LogTriggerJob - ${this._options.name}] Ignoring self-originated log to prevent infinite loop.`);
+            return;
+        }
+
+        console.log(`[LogTriggerJob - ${this._options.name}] Detected log, checking for upkeep...`);
+
         try {
             let upkeepNeeded = false;
             let performData = "0x";
@@ -115,14 +153,14 @@ export class LogTriggerJob implements IUpkeepJob {
                     topics: log.topics,
                     data: log.data,
                 };
-                
+
                 // For checkLog, the second argument `checkData` is typically empty.
                 console.log('> [DEBUG] start checkLog');
                 const result = await this._upkeepContract.callStatic.checkLog(logStruct, "0x");
                 upkeepNeeded = result.upkeepNeeded;
-                performData   = result.performData;                
+                performData   = result.performData;
                 console.log('> [DEBUG] checkLog result =', [upkeepNeeded, performData]);
-                
+
             } catch (e: unknown) {
                 const code = (typeof (e as { code?: unknown }).code === 'string') ? (e as { code: string }).code : undefined;
                 const msg = (typeof (e as { message?: unknown }).message === 'string') ? (e as { message: string }).message : '';
@@ -147,6 +185,8 @@ export class LogTriggerJob implements IUpkeepJob {
                 const tx = await this._upkeepContract.performUpkeep(performData, { gasLimit: this._options.gasLimit });
                 const receipt = await tx.wait();
                 console.log(`[LogTriggerJob - ${this._options.name}] 🎉 Upkeep performed! Tx: ${receipt.transactionHash}`);
+                // After a successful perform, mark this log as processed
+                this._processedLogs.add(logId);
             } else {
                 console.log(`[LogTriggerJob - ${this._options.name}] Log detected, but check function returned false.`);
             }

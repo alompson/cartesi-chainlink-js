@@ -2,8 +2,8 @@
 import yargs from 'yargs/yargs';
 import { hideBin } from 'yargs/helpers';
 import prompts from 'prompts';
-import { startSimulatorServer } from './server';
-import { ANVIL_ACCOUNTS } from './accounts';
+import { startSimulatorServer } from './server.js';
+import { ANVIL_ACCOUNTS } from './accounts.js';
 
 interface CliArgs {
     rpcUrl?: string;

@@ -6,11 +6,21 @@
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
   "bin": {
-    "run-local-simulator": "dist/simulator/cli.js"
+    "cartesi-chainlink": "dist/cli/main.js",
+    "run-local-simulator": "dist/simulator/cli.js",
+    "chainlink-upkeeps": "dist/cli/index.js"
   },
   "scripts": {
-    "build": "tsc",
+    "clean": "rm -rf dist",
+    "prebuild": "yarn clean",
+    "build": "tsc && chmod +x dist/cli/main.js && chmod +x dist/simulator/cli.js && chmod +x dist/cli/index.js",
     "prepublishOnly": "yarn build",
     "start": "node dist/index.js",
     "test": "jest",
@@ -27,7 +37,12 @@
     "ethers": "^5.7.2",
     "express": "^5.1.0",
     "prompts": "^2.4.2",
-    "yargs": "^18.0.0"
+    "yargs": "^18.0.0",
+    "zod": "^3.22.4"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "yarn": ">=1.22.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.3",

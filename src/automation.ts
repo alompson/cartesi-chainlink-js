@@ -1,6 +1,6 @@
-import { AutomationConfig, CreateUpkeepOptions, UpkeepInfo, IAutomationProvider } from './interfaces';
-import { ChainlinkProvider } from './providers/chainlink.provider';
-import { LocalProvider } from './providers/local.provider';
+import { AutomationConfig, CreateUpkeepOptions, UpkeepInfo, IAutomationProvider } from './interfaces.js';
+import { ChainlinkProvider } from './providers/chainlink.provider.js';
+import { LocalProvider } from './providers/local.provider.js';
 
 export class Automation {
     private _provider: IAutomationProvider;

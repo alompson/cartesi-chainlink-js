@@ -4,7 +4,7 @@
  */
 
 // Export the main class for on-chain interactions.
-export { Automation } from './automation';
+export { Automation } from './automation.js';
 
 // Export all public types and interfaces for type safety and autocompletion.
-export * from './interfaces';
+export * from './interfaces.js';

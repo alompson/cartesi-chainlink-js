@@ -1,6 +1,6 @@
 import express from 'express';
-import { UpkeepRegistry } from './registry';
-import { CreateUpkeepOptions } from '../interfaces';
+import { UpkeepRegistry } from './registry.js';
+import { CreateUpkeepOptions } from '../interfaces.js';
 
 interface SimulatorConfig {
     rpcUrl: string;

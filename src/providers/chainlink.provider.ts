@@ -1,6 +1,6 @@
 import { ethers, Signer, Contract, ContractReceipt } from 'ethers';
-import { getAutomationNetworkConfig } from '../core/networks';
-import { CreateUpkeepOptions, UpkeepInfo, IAutomationProvider, CreateLogUpkeepOptions } from '../interfaces';
+import { getAutomationNetworkConfig } from '../core/networks.js';
+import { CreateUpkeepOptions, UpkeepInfo, IAutomationProvider, CreateLogUpkeepOptions } from '../interfaces.js';
 
 // A map of known error selectors to human-readable messages
 const REVERT_SELECTORS: { [key: string]: string } = {

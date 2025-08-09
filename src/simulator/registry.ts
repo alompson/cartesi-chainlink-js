@@ -1,6 +1,6 @@
-import { ethers } from 'ethers';
-import { CreateUpkeepOptions, CreateCustomUpkeepOptions, CreateLogUpkeepOptions } from '../interfaces';
-import { IUpkeepJob, CustomLogicJob, LogTriggerJob } from './jobs';
+import { ethers, Wallet, providers } from 'ethers';
+import { CreateUpkeepOptions, CreateLogUpkeepOptions, CreateCustomUpkeepOptions } from '../interfaces.js';
+import { CustomLogicJob, IUpkeepJob, LogTriggerJob } from './jobs.js';
 
 interface SimulatorConfig {
     rpcUrl: string;
@@ -8,19 +8,19 @@ interface SimulatorConfig {
 }
 
 export class UpkeepRegistry {
-    private _jobs: Map<string, IUpkeepJob> = new Map();
-    private _signer: ethers.Wallet;
+    private _wallet: Wallet;
+    private _provider: providers.Provider;
+    private _activeJobs: Map<string, IUpkeepJob> = new Map();
 
     constructor(config: SimulatorConfig) {
-        const provider = new ethers.providers.JsonRpcProvider(config.rpcUrl);
-        this._signer = new ethers.Wallet(config.privateKey, provider);
-        console.log(`[Registry] Initialized with signer: ${this._signer.address}`);
-        console.log(`[Registry] Connected to RPC: ${config.rpcUrl}`);
+        this._provider = new ethers.providers.JsonRpcProvider(config.rpcUrl);
+        this._wallet = new ethers.Wallet(config.privateKey, this._provider);
+        console.log(`[UpkeepRegistry] Initialized with wallet address: ${this._wallet.address}`);
     }
 
     public registerUpkeep(options: CreateUpkeepOptions): void {
         const contractAddress = options.upkeepContract;
-        if (this._jobs.has(contractAddress)) {
+        if (this._activeJobs.has(contractAddress)) {
             throw new Error(`Upkeep for contract ${contractAddress} is already registered.`);
         }
 
@@ -29,19 +29,19 @@ export class UpkeepRegistry {
 
             let job: IUpkeepJob;
             if (options.triggerType === 'custom') {
-                job = new CustomLogicJob(options as CreateCustomUpkeepOptions, this._signer);
+                job = new CustomLogicJob(options as CreateCustomUpkeepOptions, this._wallet);
             } else if (options.triggerType === 'log') {
                 // Add validation for log-specific options
                 const logOptions = options as CreateLogUpkeepOptions;
                 if (!logOptions.logEmitterAddress || !logOptions.logEventSignature) {
                     throw new Error("For log triggers, 'logEmitterAddress' and 'logEventSignature' are required.");
                 }
-                job = new LogTriggerJob(logOptions, this._signer);
+                job = new LogTriggerJob(logOptions, this._wallet);
             } else {
                 throw new Error(`Unsupported trigger type: ${(options as unknown as { triggerType: string }).triggerType}`);
             }
 
-            this._jobs.set(contractAddress, job);
+            this._activeJobs.set(contractAddress, job);
             job.start();
             
             console.log(`[Registry] Successfully registered and started job for ${options.name}`);
@@ -54,10 +54,10 @@ export class UpkeepRegistry {
     }
 
     public unregisterUpkeep(contractAddress: string): void {
-        const job = this._jobs.get(contractAddress);
+        const job = this._activeJobs.get(contractAddress);
         if (job) {
             job.stop();
-            this._jobs.delete(contractAddress);
+            this._activeJobs.delete(contractAddress);
             console.log(`[Registry] Stopped and unregistered upkeep for ${contractAddress}.`);
         } else {
             throw new Error(`No upkeep registered for contract ${contractAddress}.`);
@@ -65,6 +65,6 @@ export class UpkeepRegistry {
     }
 
     public getRegisteredUpkeepsCount(): number {
-        return this._jobs.size;
+        return this._activeJobs.size;
     }
 }

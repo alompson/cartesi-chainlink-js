@@ -1,14 +1,35 @@
 import { ContractInterface } from 'ethers';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+// Helper to resolve paths relative to the current module, which is crucial for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper function to load ABI JSON files robustly
+function loadAbi(contractName: string): ContractInterface {
+    // Navigate from dist/core -> node_modules
+    const abiPath = path.resolve(
+        __dirname,
+        '../../node_modules/@chainlink/contracts/abi/v0.8/',
+        `${contractName}.json`
+    );
+    try {
+        const fileContent = fs.readFileSync(abiPath, 'utf-8');
+        return JSON.parse(fileContent);
+    } catch (e) {
+        console.error(`Failed to load ABI for ${contractName} at ${abiPath}`);
+        throw e;
+    }
+}
 
 // =================================================================
 // ABIs
 // =================================================================
-// It's best practice to import all ABI versions your library might need.
-// The configuration below will then select the correct one for each network.
-
-import AutomationRegistrarV2_1_ABI from '@chainlink/contracts/abi/v0.8/AutomationRegistrar2_1.json';
-import AutomationRegistryV2_1_ABI from '@chainlink/contracts/abi/v0.8/KeeperRegistry2_0.json';
-import LinkTokenABI from '@chainlink/contracts/abi/v0.8/LinkTokenInterface.json';
+const AutomationRegistrarV2_1_ABI = loadAbi('AutomationRegistrar2_1');
+const AutomationRegistryV2_1_ABI = loadAbi('KeeperRegistry2_0');
+const LinkTokenABI = loadAbi('LinkTokenInterface');
 
 
 // =================================================================

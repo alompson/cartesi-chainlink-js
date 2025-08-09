@@ -1,12 +1,13 @@
 {
   "compilerOptions": {
     /* Build Settings */
-    "target": "es2020",                 
-    "module": "commonjs",              
-    "outDir": "./dist",                 
-    "rootDir": "./src",                 
-    "declaration": true,   
-    "resolveJsonModule": true,       
+    "target": "es2020",
+    "module": "Node16",
+    "moduleResolution": "node16",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "resolveJsonModule": true,
 
     /* Strictness & Best Practices */
     "strict": true,
@@ -14,5 +15,5 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src/**/*"] // Tells TSC to only compile files in the 'src' directory
+  "include": ["src/**/*"]
 }

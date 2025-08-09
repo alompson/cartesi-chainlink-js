@@ -1,7 +1,7 @@
 import axios from 'axios';
-import { IAutomationProvider, CreateUpkeepOptions, UpkeepInfo } from '../interfaces';
+import { CreateUpkeepOptions, IAutomationProvider, UpkeepInfo } from '../interfaces.js';
 
-const SIMULATOR_BASE_URL = 'http://localhost:7788';
+const SIMULATOR_BASE_URL = process.env.SIMULATOR_BASE_URL || 'http://localhost:7788';
 
 export class LocalProvider implements IAutomationProvider {
 

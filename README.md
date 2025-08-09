@@ -1,157 +1,461 @@
-# Chainlink Automation Library
+# Cartesi Chainlink Library
 
-A TypeScript library for registering and managing Chainlink Automation upkeeps, with a built-in simulator for local development and testing.
+A comprehensive TypeScript library and CLI toolkit for integrating Chainlink Automation with Cartesi dApps, featuring a powerful local simulator for seamless development and testing.
 
-This library simplifies all interactions with the Chainlink Automation ecosystem, providing a unified, strongly-typed API for both on-chain and local environments.
+## 🚀 Overview
 
-While the library is generic, it includes specific, production-ready smart contract examples for integrating Chainlink Automation with **Cartesi dApps**.
+This library provides everything you need to work with Chainlink Automation:
 
-## Understanding Chainlink Automation
+- **📦 TypeScript Library**: Strongly-typed API for creating and managing upkeeps
+- **🏠 Local Simulator**: Test automation locally without testnets or LINK tokens  
+- **🔧 Unified CLI**: Deploy contracts, register upkeeps, and manage your automation workflow
+- **📋 Manifest System**: Declarative JSON configuration for reproducible deployments
+- **🎯 Cartesi Integration**: Ready-to-use examples for InputBox automation
 
-Chainlink Automation is a decentralized service that allows you to run your smart contract's functions based on triggers you define. An **Upkeep** is the name for the automated job you register with the network. A decentralized network of nodes (Keepers) earns rewards by reliably monitoring your upkeep's conditions and submitting transactions to execute it when those conditions are met.
+## 💡 Why This Matters for Cartesi Developers
 
-This library supports the two primary trigger types:
--   **Custom Logic (`custom`):** The network checks your contract on every new block. Your `checkUpkeep` function contains custom logic (e.g., checking if a certain amount of time has passed) to tell the network when to run the upkeep.
--   **Log Trigger (`log`):** The network listens for a specific event (a log) to be emitted from a contract you specify. When the event is detected, it triggers your upkeep.
+Cartesi dApps often need off-chain computation triggers — moments when something in the blockchain world signals that your Cartesi machine should process data, advance its state, or interact with users.
 
-For more in-depth information, please refer to the [official Chainlink Automation documentation](https://docs.chain.link/chainlink-automation).
+Common trigger types in Cartesi workflows include:
 
----
+- **Cartesi InputBox events** — e.g., the `InputAdded` event signals that new input data is ready for processing
+- **Time-based tasks** — e.g., periodic data aggregation, daily settlements, or machine maintenance jobs  
+- **Custom state conditions** — e.g., start a computation only if a certain state threshold is reached
 
-## Local Testing with the Simulator
+Traditionally, developers must:
+- Deploy & fund each upkeep manually via the Chainlink UI
+- Keep track of upkeep IDs across staging, testnet, and mainnet
+- Re-deploy and re-register every time the upkeep contract changes
+- Write custom scripts to test upkeep logic against live networks
 
-For rapid development and integration testing, this library includes a powerful **Local Simulator**. This tool mimics the behavior of the entire Chainlink Automation network on your local machine, allowing you to test your contracts end-to-end without needing a live testnet, faucets, or real LINK tokens.
+This library removes that friction by:
+- **Single Source of Truth** – Define deployment & registration in one JSON manifest
+- **Environment Parity** – Use the same manifest for local simulation and live Chainlink networks
+- **Bulk & Repeatable** – Register multiple upkeeps from CLI or code without UI clicks
+- **Cartesi-Ready Templates** – Out-of-the-box examples for InputBox listeners, event-driven dApps, and cron-style automations
 
-### How It Works
+With this library, Cartesi developers can:
+- Run the full Cartesi + Chainlink automation flow locally on Anvil/Hardhat before touching a testnet
+- Quickly iterate on upkeep logic without manual re-registration
+- Deploy and register multiple upkeeps programmatically (e.g., one upkeep per dApp instance)
+- Combine log triggers (InputBox events) with time-based triggers for hybrid automation
 
-The local testing environment uses a client-server model:
-1.  **The Simulator Service (The "Engine"):** A background service you run from your terminal. It connects to your local blockchain (like Anvil or Hardhat), listens for blockchain events, and acts as a local "Keeper" to execute your upkeeps.
-2.  **The Library Client (The "Remote Control"):** When you initialize the library in `'local'` mode, your test script communicates with the running simulator service via a simple API, telling it which contracts to watch.
+## 🛠️ Installation
 
-### Getting Started with Local Testing
-
-Follow these steps to test your automation logic locally.
-
-#### 1. Run a Local Blockchain
-In your first terminal, start your preferred local node.
 ```bash
-# For Foundry users
+npm install cartesi-chainlink-lib
+# or
+yarn add cartesi-chainlink-lib
+```
+
+## 📚 Quick Start
+
+### 1. Choose Your Approach
+
+**🏠 Local Development** (Recommended for testing)
+```bash
+# Start local blockchain
 anvil
 
-# For Hardhat users
-npx hardhat node
+# Start the simulator in another terminal  
+npx cartesi-chainlink dev start
+
+# Deploy and register your upkeep
+npx cartesi-chainlink upkeep apply my-manifest.json --private-key 0x...
 ```
 
-#### 2. Run the Simulator Service
-In a second terminal, start the simulator service. It will prompt you for the RPC URL and a private key if you don't provide them as arguments.
+**🌐 Live Networks** (Sepolia, Mainnet, etc.)
 ```bash
-# This will start the service with interactive prompts
-npx run-local-simulator
-
-# Or, provide arguments directly
-npx run-local-simulator --rpc-url http://127.0.0.1:8545 --private-key 0xac09...
+# Deploy to live network
+npx cartesi-chainlink upkeep apply my-manifest.json \
+  --network sepolia \
+  --private-key 0x...
 ```
-The service will now be running in the background, waiting for instructions.
 
-#### 3. Write Your Test Script
-In your test script (e.g., using Jest), import and use the library in `'local'` mode.
+### 2. Generate a Manifest Template
+
+```bash
+# Create a log-triggered upkeep template
+npx cartesi-chainlink util init --type log --output my-upkeep.json
+
+# Create a custom logic (cron-style) upkeep template  
+npx cartesi-chainlink util init --type custom --output my-cron.json
+```
+
+### 3. Using the Library in Code
 
 ```typescript
 import { Automation } from 'cartesi-chainlink-lib';
 import { ethers } from 'ethers';
 
-// This test assumes you have already deployed your upkeep contract to the local node.
-const upkeepContractAddress = '0xYOUR_DEPLOYED_UPKEEP_CONTRACT_ADDRESS';
-
-// Connect a signer to your local node
 const provider = new ethers.providers.JsonRpcProvider('http://127.0.0.1:8545');
-const signer = new ethers.Wallet('0xac09...', provider);
+const signer = new ethers.Wallet('0x...', provider);
 
-// 1. Initialize the library in 'local' mode
+// For local testing
 const automation = new Automation({
     signer,
-    chainId: 31337, // Default local chain ID
-    mode: 'local' 
+    chainId: 31337,
+    mode: 'local'
 });
 
-async function registerLocalUpkeep() {
-    // 2. Register the upkeep with the running simulator service
-    const { upkeepId } = await automation.createUpkeep({
-        name: 'My Local Test Upkeep',
-        upkeepContract: upkeepContractAddress,
-        triggerType: 'custom', // or 'log'
-        gasLimit: 500_000,
-        // Note: `initialFunds` is not required for local mode
-    });
-    console.log(`Upkeep registered locally with ID: ${upkeepId}`); // ID is the contract address
+// For live networks  
+const automation = new Automation({
+    signer, 
+    chainId: 11155111, // Sepolia
+    mode: 'chainlink'
+});
 
-    // 3. Your test logic can now proceed...
-    // The simulator will automatically call performUpkeep when conditions are met.
-}
-
-registerLocalUpkeep();
+// Register an upkeep
+const { upkeepId } = await automation.createUpkeep({
+    name: 'My Automation',
+    upkeepContract: '0x...',
+    gasLimit: 500_000,
+    triggerType: 'custom',
+    initialFunds: '10.0' // LINK tokens (not needed for local mode)
+});
 ```
+
+## 🏗️ CLI Commands
+
+### Development Commands
+
+```bash
+# Start the local simulator with interactive setup
+npx cartesi-chainlink dev start
+
+# Check simulator status  
+npx cartesi-chainlink dev status
+
+# Stop the simulator
+npx cartesi-chainlink dev stop
+```
+
+### Upkeep Management
+
+```bash
+# Deploy and register from manifest
+npx cartesi-chainlink upkeep apply manifest.json --private-key 0x...
+
+# Register upkeep directly
+npx cartesi-chainlink upkeep register \
+  --name "My Upkeep" \
+  --contract 0x... \
+  --trigger custom \
+  --gas-limit 500000
+
+# List registered upkeeps
+npx cartesi-chainlink upkeep list
+
+# Show upkeep details
+npx cartesi-chainlink upkeep show <upkeep-id>
+
+# Add funds to upkeep
+npx cartesi-chainlink upkeep fund <upkeep-id> --amount 5.0
+```
+
+### Network Information
+
+```bash
+# List all supported networks
+npx cartesi-chainlink network list
+
+# Test network connectivity
+npx cartesi-chainlink network test --rpc-url https://...
+
+# Show network details
+npx cartesi-chainlink network show --chain-id 11155111
+```
+
+### Utility Commands
+
+```bash
+# Generate manifest templates
+npx cartesi-chainlink util init --type log --network local
+
+# Validate manifest files
+npx cartesi-chainlink util validate manifest.json
+
+# Show CLI version and status
+npx cartesi-chainlink util version
+```
+
+### Contract Management
+
+```bash
+# Deploy contract from artifact
+npx cartesi-chainlink contract deploy artifact.json --args "0x..." 100
+
+# Verify deployed contract
+npx cartesi-chainlink contract verify 0x... --network sepolia
+
+# Check contract compatibility
+npx cartesi-chainlink contract check 0x...
+```
+
+## 📋 Manifest System
+
+The manifest system allows you to define your entire deployment and registration process in a single JSON file:
+
+```json
+{
+  "version": "1",
+  "network": {
+    "mode": "local",
+    "chainId": 31337
+  },
+  "deployment": {
+    "artifact": "./artifacts/MyUpkeep.json",
+    "constructorArgs": ["0x123...", 60]
+  },
+  "registration": {
+    "name": "Counter Automation",
+    "upkeepContract": "auto",
+    "gasLimit": 300000,
+    "triggerType": "custom"
+  }
+}
+```
+
+Key features:
+- **Auto-deployment**: Set `upkeepContract: "auto"` to deploy from artifacts
+- **Network flexibility**: Works with both local and live networks
+- **Type validation**: Full Zod schema validation with helpful error messages
+- **State tracking**: Generates `.state.json` files for deployed contracts
+
+## 🎯 Chainlink Automation Types
+
+### Custom Logic Upkeeps
+Perfect for time-based automation, periodic tasks, or custom conditional logic:
+
+```typescript
+// Your contract implements checkUpkeep and performUpkeep
+contract MyUpkeep is AutomationCompatibleInterface {
+    uint256 public lastTimeStamp;
+    uint256 public immutable interval;
+    
+    function checkUpkeep(bytes calldata) external view override 
+        returns (bool upkeepNeeded, bytes memory) {
+        upkeepNeeded = (block.timestamp - lastTimeStamp) > interval;
+    }
+    
+    function performUpkeep(bytes calldata) external override {
+        lastTimeStamp = block.timestamp;
+        // Your automation logic here
+    }
+}
+```
+
+### Log-Triggered Upkeeps  
+Automatically respond to blockchain events:
+
+```typescript
+// Your contract implements ILogAutomation
+contract LogUpkeep is ILogAutomation {
+    function checkLog(Log calldata log, bytes calldata) external override 
+        returns (bool upkeepNeeded, bytes memory performData) {
+        // Validate the log and return automation data
+        return (true, abi.encode(log.data));
+    }
+    
+    function performUpkeep(bytes calldata performData) external override {
+        // Process the event data
+    }
+}
+```
+
+## 🏠 Local Development
+
+The local simulator provides a complete Chainlink Automation environment on your machine:
+
+### How It Works
+1. **Simulator Service**: Connects to your local blockchain (Anvil/Hardhat)
+2. **Block Monitoring**: Watches for new blocks and events
+3. **Upkeep Execution**: Automatically calls your contracts when conditions are met
+4. **No LINK Required**: No token funding needed for local testing
+
+### Best Practices
+- Start with local testing before deploying to live networks
+- Use the same contract code for local and live environments
+- Test both happy path and edge cases locally
+- Verify gas limits work for your specific use case
+
+## 🌐 Live Network Support
+
+Supports all major Chainlink Automation networks:
+
+- **Ethereum**: Mainnet, Sepolia
+- **Arbitrum**: One, Sepolia  
+- **Polygon**: Mainnet
+- **Base**: Mainnet, Sepolia
+- **Optimism**: Mainnet, Sepolia
+- **Avalanche**: Mainnet, Fuji
+- **BNB Chain**: Mainnet, Testnet
+- **And many more...**
+
+Use `npx cartesi-chainlink network list` for the complete list.
+
+## 📦 Examples
+
+The `examples/` directory contains complete, runnable examples.
+Each example includes:
+- Solidity contracts
+- Deployment artifacts
+- JSON manifest configurations
+- Step-by-step README instructions
+
+### 01 — Log-Triggered InputBox Processor (Cartesi)
+**Goal:** Automatically process new inputs sent to a Cartesi dApp when the `InputAdded` event is emitted by the InputBox.
+
+**Why Chainlink Automation?**
+Instead of having an off-chain script poll the chain, we use a log-based upkeep that wakes up instantly on relevant events.
+
+**Manifest Example:**
+```json
+{
+  "version": "1",
+  "network": {
+    "mode": "chainlink",
+    "chainId": 11155111
+  },
+  "deployment": {
+    "artifact": "./artifacts/InputProcessorUpkeep.json",
+    "constructorArgs": ["0xCARTESI_INPUT_BOX_ADDRESS"]
+  },
+  "registration": {
+    "name": "Cartesi InputBox Processor",
+    "upkeepContract": "auto",
+    "gasLimit": 500000,
+    "triggerType": "log",
+    "logEmitterAddress": "0xCARTESI_INPUT_BOX_ADDRESS",
+    "logEventSignature": "InputAdded(address,uint256,bytes)",
+    "initialFunds": "10.0"
+  }
+}
+```
+
+**Contract Skeleton:**
+```solidity
+contract InputProcessorUpkeep is ILogAutomation {
+    address public immutable inputBox;
+
+    constructor(address _inputBox) {
+        inputBox = _inputBox;
+    }
+
+    function checkLog(Log calldata log, bytes calldata)
+        external view override
+        returns (bool upkeepNeeded, bytes memory performData)
+    {
+        upkeepNeeded = (log.source == inputBox);
+        performData = log.data; // forward input payload
+    }
+
+    function performUpkeep(bytes calldata performData) external override {
+        // Parse and submit data to the Cartesi machine
+    }
+}
+```
+
+### 02 — Time-Based Cartesi Aggregator
+**Goal:** Every 24 hours, trigger a Cartesi computation that aggregates data stored in the machine.
+
+**Why Chainlink Automation?**
+Instead of running a cron job off-chain, we use a custom logic upkeep that runs on schedule using `block.timestamp`.
+
+**Manifest Example:**
+```json
+{
+  "version": "1",
+  "network": {
+    "mode": "chainlink",
+    "chainId": 11155111
+  },
+  "deployment": {
+    "artifact": "./artifacts/DailyAggregatorUpkeep.json",
+    "constructorArgs": [86400]
+  },
+  "registration": {
+    "name": "Daily Cartesi Aggregator",
+    "upkeepContract": "auto",
+    "gasLimit": 400000,
+    "triggerType": "custom",
+    "initialFunds": "5.0"
+  }
+}
+```
+
+**Contract Skeleton:**
+```solidity
+contract DailyAggregatorUpkeep is AutomationCompatibleInterface {
+    uint256 public immutable interval;
+    uint256 public lastTimeStamp;
+
+    constructor(uint256 _interval) {
+        interval = _interval;
+        lastTimeStamp = block.timestamp;
+    }
+
+    function checkUpkeep(bytes calldata)
+        external view override
+        returns (bool upkeepNeeded, bytes memory)
+    {
+        upkeepNeeded = (block.timestamp - lastTimeStamp) > interval;
+    }
+
+    function performUpkeep(bytes calldata) external override {
+        lastTimeStamp = block.timestamp;
+        // Trigger Cartesi machine to aggregate data
+    }
+}
+```
+
+This gives Cartesi developers two plug-and-play starting points:
+- **Log-based** for event-driven dApps
+- **Time-based** for periodic jobs
+
+### Quick Start with Pre-built Examples
+```bash
+# Use a ready-made InputBox processor manifest
+npx cartesi-chainlink upkeep apply examples/manifests/inputbox-processor.json --network sepolia --private-key 0x...
+
+# Use a ready-made time-based aggregator manifest  
+npx cartesi-chainlink upkeep apply examples/manifests/daily-aggregator.json --network sepolia --private-key 0x...
+```
+
+## 🧪 Testing
+
+```bash
+# Run the test suite
+yarn test
+
+# Run with coverage
+yarn test --coverage
+
+# Lint the codebase
+yarn lint
+
+# Type check
+yarn typecheck
+```
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes and add tests
+4. Run the test suite: `yarn test`
+5. Submit a pull request
+
+## 📄 License
+
+MIT - see [LICENSE](LICENSE) for details.
+
+## 🔗 Links
+
+- [Chainlink Automation Documentation](https://docs.chain.link/chainlink-automation)
+- [Cartesi Documentation](https://docs.cartesi.io/)
+- [GitHub Repository](https://github.com/your-org/cartesi-chainlink-lib)
 
 ---
 
-## On-Chain Usage (Testnet/Mainnet)
-
-This section describes how to use the library to interact with the live Chainlink Automation network.
-
-### Prerequisites
-
-Before using this library against a live network, you will need:
-
-1.  **A Deployed Contract:** An Automation-compatible smart contract deployed on your target network. You can use the contracts in the `/examples` directory as a starting point.
-2.  **The Contract Address:** The address of your deployed compatible contract.
-3.  **A Funded Wallet:** A wallet with a private key or mnemonic that holds:
-    -   Sufficient native currency (e.g., ETH) for transaction gas fees.
-    -   Sufficient LINK tokens to fund your upkeep. All upkeeps are paid for in LINK.
-4.  **An RPC URL:** The URL of a node for your target network (e.g., from Infura, Alchemy, or a public node).
-
-### Core Features
-
--   **Programmatic Upkeep Management:** Create, pause, unpause, cancel, and fund upkeeps directly from your code.
--   **Strongly-Typed:** A full suite of TypeScript interfaces for all contract options and return values.
--   **Built-in Local Simulator:** Test your entire automation flow without leaving your local environment.
--   **Cartesi-Ready Examples:** Smart contract examples for the most common Cartesi automation patterns.
--   **Log & Custom Logic Support:** Full support for both `custom` logic (including time-based) and `log`-triggered upkeeps.
-
-### Example: Registering an On-Chain Upkeep
-
-This example registers the `LogTriggeredInputTracker` to listen for `InputAdded` events from the Cartesi `InputBox` on a live network like Sepolia.
-
-```typescript
-import { Automation } from 'cartesi-chainlink-lib';
-import { ethers } from 'ethers';
-
-const provider = new ethers.providers.JsonRpcProvider('YOUR_RPC_URL');
-const signer = new ethers.Wallet('YOUR_PRIVATE_KEY', provider);
-const chainId = 11155111; // Sepolia
-
-// Initialize in the default 'chainlink' mode
-const automation = new Automation({ signer, chainId });
-
-// The official Cartesi InputBox address for your network
-const inputBoxAddress = '0xINPUT_BOX_ADDRESS'; 
-// The address of your deployed upkeep contract
-const upkeepContractAddress = '0xUPKEEP_CONTRACT_ADDRESS';
-
-const options = {
-    name: 'Cartesi Input Tracker',
-    upkeepContract: upkeepContractAddress,
-    gasLimit: 500_000,
-    initialFunds: '10.0', // 10 LINK
-    triggerType: 'log',
-    // Log-specific options
-    logEmitterAddress: inputBoxAddress,
-    logEventSignature: 'InputAdded(address,uint256,bytes)',
-};
-
-async function register() {
-    const { upkeepId } = await automation.createUpkeep(options);
-    console.log(`Upkeep registered with ID: ${upkeepId}`);
-}
-
-register();
-```
+**Need help?** Check the examples, run `npx cartesi-chainlink --help`, or open an issue on GitHub.
