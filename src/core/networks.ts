@@ -9,19 +9,41 @@ const __dirname = path.dirname(__filename);
 
 // Helper function to load ABI JSON files robustly
 function loadAbi(contractName: string): ContractInterface {
-    // Navigate from dist/core -> node_modules
-    const abiPath = path.resolve(
-        __dirname,
-        '../../node_modules/@chainlink/contracts/abi/v0.8/',
-        `${contractName}.json`
-    );
-    try {
-        const fileContent = fs.readFileSync(abiPath, 'utf-8');
-        return JSON.parse(fileContent);
-    } catch (e) {
-        console.error(`Failed to load ABI for ${contractName} at ${abiPath}`);
-        throw e;
+    // Try multiple possible paths to find the ABI file
+    const possiblePaths = [
+        // When running from dist in the same project
+        path.resolve(__dirname, '../../node_modules/@chainlink/contracts/abi/v0.8/', `${contractName}.json`),
+        // When installed as a package in another project
+        path.resolve(__dirname, '../../../@chainlink/contracts/abi/v0.8/', `${contractName}.json`),
+        // Alternative path when nested differently
+        path.resolve(__dirname, '../../../../node_modules/@chainlink/contracts/abi/v0.8/', `${contractName}.json`),
+        // Try using require.resolve as fallback
+    ];
+
+    // Try each path until we find one that works
+    for (const abiPath of possiblePaths) {
+        try {
+            if (fs.existsSync(abiPath)) {
+                const fileContent = fs.readFileSync(abiPath, 'utf-8');
+                return JSON.parse(fileContent);
+            }
+        } catch (_e) {
+            // Continue to next path
+        }
     }
+
+    // If none of the paths work, try using require.resolve
+    try {
+        const resolvedPath = require.resolve('@chainlink/contracts/abi/v0.8/' + contractName + '.json');
+        const fileContent = fs.readFileSync(resolvedPath, 'utf-8');
+        return JSON.parse(fileContent);
+    } catch (_e) {
+        // Final fallback failed
+    }
+
+    // If all attempts fail, throw a helpful error
+    const attemptedPaths = possiblePaths.join('\n  - ');
+    throw new Error(`Failed to load ABI for ${contractName}. Attempted paths:\n  - ${attemptedPaths}\n\nMake sure @chainlink/contracts is installed as a dependency.`);
 }
 
 // =================================================================
