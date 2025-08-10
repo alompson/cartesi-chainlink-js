@@ -59,7 +59,6 @@ export class CustomLogicJob implements IUpkeepJob {
                 return;
             }
 
-            console.log(`[CustomLogicJob - ${this._options.name}] New block ${currentBlock}: Checking upkeep...`);
             this._lastProcessedBlock = currentBlock;
 
             const [upkeepNeeded, performData] = await this._upkeepContract.checkUpkeep(this._options.checkData || '0x');
@@ -123,14 +122,17 @@ export class LogTriggerJob implements IUpkeepJob {
             return;
         }
 
-        // Check if the transaction was sent by this simulator's wallet
-        const tx = await this._provider.getTransaction(log.transactionHash);
-        const signerAddress = await this._signer.getAddress();
-        if (tx && tx.from === signerAddress) {
-            console.log(`[LogTriggerJob - ${this._options.name}] Ignoring self-originated log to prevent infinite loop.`);
-            return;
-        }
+        // TODO: Create a narrower event filter to avoid self-originated logs, the current commented one is too broad and doesn't reflect the actual usage of the log automation.
+        // // Check if the transaction was sent by this simulator's wallet
+        // const tx = await this._provider.getTransaction(log.transactionHash);
+        // const signerAddress = await this._signer.getAddress();
 
+        // if (tx && tx.from === signerAddress) {
+        //     console.log(`[LogTriggerJob - ${this._options.name}] Ignoring self-originated log to prevent infinite loop.`);
+        //     return;
+        // }
+
+        
         console.log(`[LogTriggerJob - ${this._options.name}] Detected log, checking for upkeep...`);
 
         try {
