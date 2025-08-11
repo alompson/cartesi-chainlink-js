@@ -93,118 +93,119 @@ export class CustomLogicJob implements IUpkeepJob {
     }
 }
 
-
-export class LogTriggerJob implements IUpkeepJob {
+// Helper: event signature -> topic0
+function topic0FromSignature(sig: string): string {
+    return ethers.utils.id(sig);
+  }
+  
+  // Helper: address -> 32-byte topic (topic1)
+  function addressToTopic(addr: string): string {
+    return ethers.utils.hexZeroPad(addr, 32);
+  }
+  
+  // Helper: number/bigint -> 32-byte topic (topic2, topic3, etc.)
+  function uintToTopic(n: number | bigint): string {
+    const bn = ethers.BigNumber.from(n);
+    return ethers.utils.hexZeroPad(ethers.utils.hexlify(bn), 32);
+  }
+  export class LogTriggerJob {
     private _upkeepContract: Contract;
     private _signer: ethers.Signer;
     private _provider: ethers.providers.Provider;
-    private _eventFilter: ethers.EventFilter;
-    private _processedLogs: Set<string> = new Set(); // For deduplication
-
+  
+    // IMPORTANT: provider filter, not Contract's EventFilter
+    private _eventFilter: ethers.providers.Filter;
+  
+    private _processedLogs = new Set<string>();
+  
     constructor(private _options: CreateLogUpkeepOptions, signer: ethers.Signer) {
-        this._signer = signer;
-        this._provider = signer.provider!;
-        // Use the combined ABI to handle both legacy and modern log upkeeps
-        this._upkeepContract = new ethers.Contract(_options.upkeepContract, CombinedLogAutomationABI, this._signer);
-
-        // Create the specific event filter to listen for
-        this._eventFilter = {
-            address: _options.logEmitterAddress,
-            topics: [ethers.utils.id(_options.logEventSignature)]
-        };
+      this._signer = signer;
+      this._provider = signer.provider!;
+  
+      this._upkeepContract = new Contract(
+        _options.upkeepContract,
+        CombinedLogAutomationABI,
+        this._signer
+      );
+  
+      // Build topics array with correct typing and null wildcards
+      const topic0 = topic0FromSignature(_options.logEventSignature);
+      const t1 = _options.logTopicFilters?.[0]
+        ? addressToTopic(_options.logTopicFilters[0]!)
+        : null;
+      const t2 = _options.logTopicFilters?.[1]
+        ? uintToTopic(BigInt(_options.logTopicFilters[1]!))
+        : null;
+      const t3 = _options.logTopicFilters?.[2]
+        ? uintToTopic(BigInt(_options.logTopicFilters[2]!))
+        : null;
+  
+      const topics: (string | string[] | null)[] = [topic0, t1, t2, t3];
+  
+      // This is the type that provider.on(...) wants
+      this._eventFilter = {
+        address: _options.logEmitterAddress,
+        topics
+      };
     }
-
-    // The handler that will be called ONLY when a matching log is found
+  
     private _onLogDetected = async (log: ethers.providers.Log) => {
-        const logId = `${log.transactionHash}-${log.logIndex}`;
-        if (this._processedLogs.has(logId)) {
-            // This is a log we have already seen and processed.
-            return;
-        }
-
-        // TODO: Create a narrower event filter to avoid self-originated logs, the current commented one is too broad and doesn't reflect the actual usage of the log automation.
-        // // Check if the transaction was sent by this simulator's wallet
-        // const tx = await this._provider.getTransaction(log.transactionHash);
-        // const signerAddress = await this._signer.getAddress();
-
-        // if (tx && tx.from === signerAddress) {
-        //     console.log(`[LogTriggerJob - ${this._options.name}] Ignoring self-originated log to prevent infinite loop.`);
-        //     return;
-        // }
-
-        
-        console.log(`[LogTriggerJob - ${this._options.name}] Detected log, checking for upkeep...`);
-
+      const logId = `${log.transactionHash}-${log.logIndex}`;
+      if (this._processedLogs.has(logId)) return;
+  
+      try {
+        // Build ILogAutomation.Log struct
+        const block = await this._provider.getBlock(log.blockNumber);
+        const logStruct = {
+          index: log.logIndex,
+          timestamp: block.timestamp,
+          txHash: log.transactionHash as string,
+          blockNumber: log.blockNumber,
+          blockHash: log.blockHash as string,
+          source: log.address,
+          topics: log.topics,
+          data: log.data
+        };
+  
+        // Prefer checkLog, fallback to checkUpkeep
+        let upkeepNeeded = false;
+        let performData = '0x';
+  
         try {
-            let upkeepNeeded = false;
-            let performData = "0x";
-
-            // "Probe" for the correct check function by attempting to call checkLog first.
-            try {
-                // To build the full Log struct, we need the block timestamp.
-                const block = await this._provider.getBlock(log.blockNumber);
-
-                // Construct the full Log struct that the ILogAutomation interface expects.
-                const logStruct = {
-                    index: log.logIndex,
-                    timestamp: block.timestamp,
-                    txHash: log.transactionHash,
-                    blockNumber: log.blockNumber,
-                    blockHash: log.blockHash,
-                    source: log.address,
-                    topics: log.topics,
-                    data: log.data,
-                };
-
-                // For checkLog, the second argument `checkData` is typically empty.
-                console.log('> [DEBUG] start checkLog');
-                const result = await this._upkeepContract.callStatic.checkLog(logStruct, "0x");
-                upkeepNeeded = result.upkeepNeeded;
-                performData   = result.performData;
-                console.log('> [DEBUG] checkLog result =', [upkeepNeeded, performData]);
-
-            } catch (e: unknown) {
-                const code = (typeof (e as { code?: unknown }).code === 'string') ? (e as { code: string }).code : undefined;
-                const msg = (typeof (e as { message?: unknown }).message === 'string') ? (e as { message: string }).message : '';
-                if (code === 'INVALID_ARGUMENT' || msg.includes('checkLog is not a function')) {
-                    // This is likely a legacy contract, fall back to checkUpkeep.
-                    console.log(`[LogTriggerJob - ${this._options.name}] 'checkLog' not found, falling back to 'checkUpkeep'.`);
-                    const checkData = ethers.utils.defaultAbiCoder.encode(
-                        ['bytes32[]', 'bytes'],
-                        [log.topics, log.data]
-                    );
-                    [upkeepNeeded, performData] = await this._upkeepContract.checkUpkeep(checkData);
-                } else {
-                    // Re-throw other unexpected errors
-                    throw e;
-                }
-            }
-
-            if (upkeepNeeded) {
-                console.log('> [DEBUG] gasLimit override =', this._options.gasLimit);
-                console.log('> [DEBUG] performData =', performData);
-
-                const tx = await this._upkeepContract.performUpkeep(performData, { gasLimit: this._options.gasLimit });
-                const receipt = await tx.wait();
-                console.log(`[LogTriggerJob - ${this._options.name}] 🎉 Upkeep performed! Tx: ${receipt.transactionHash}`);
-                // After a successful perform, mark this log as processed
-                this._processedLogs.add(logId);
-            } else {
-                console.log(`[LogTriggerJob - ${this._options.name}] Log detected, but check function returned false.`);
-            }
-        } catch (error: unknown) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error(`[LogTriggerJob - ${this._options.name}] Error during perform:`, errorMessage);
+          const res = await this._upkeepContract.callStatic.checkLog(logStruct, '0x');
+          ({ upkeepNeeded, performData } = res);
+        } catch (e) {
+          const err = e as { code?: string; message?: string };
+          if (err.code === 'INVALID_ARGUMENT' || (err.message ?? '').includes('checkLog')) {
+            const checkData = ethers.utils.defaultAbiCoder.encode(
+              ['bytes32[]', 'bytes'],
+              [log.topics, log.data]
+            );
+            const res2 = await this._upkeepContract.callStatic.checkUpkeep(checkData);
+            upkeepNeeded = res2[0];
+            performData = res2[1];
+          } else {
+            throw e;
+          }
         }
+  
+        if (upkeepNeeded) {
+          const tx = await this._upkeepContract.performUpkeep(performData, {
+            gasLimit: this._options.gasLimit
+          });
+          await tx.wait();
+          this._processedLogs.add(logId);
+        }
+      } catch (err) {
+        console.error(`[LogTriggerJob - ${this._options.name}]`, (err as Error).message);
+      }
     };
-
+  
     start(): void {
-        console.log(`[LogTriggerJob - ${this._options.name}] Starting... Listening for event "${this._options.logEventSignature}" from ${this._options.logEmitterAddress}.`);
-        this._provider.on(this._eventFilter, this._onLogDetected);
+      this._provider.on(this._eventFilter, this._onLogDetected);
     }
-
+  
     stop(): void {
-        console.log(`[LogTriggerJob - ${this._options.name}] Stopping...`);
-        this._provider.off(this._eventFilter, this._onLogDetected);
+      this._provider.off(this._eventFilter, this._onLogDetected);
     }
-}
+  }
