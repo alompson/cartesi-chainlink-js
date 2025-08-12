@@ -148,6 +148,8 @@ export class LogTriggerJob {
   }
 
   private _onLogDetected = async (log: ethers.providers.Log) => {
+
+    console.log(`[LogTriggerJob - ${this._options.name}] Log detected: ${log.transactionHash}-${log.logIndex}`);
     const logId = `${log.transactionHash}-${log.logIndex}`;
     if (this._processedLogs.has(logId)) return;
 
@@ -187,11 +189,13 @@ export class LogTriggerJob {
       }
 
       if (upkeepNeeded) {
+        console.log(`[LogTriggerJob - ${this._options.name}] Upkeep needed. Performing...`);
         const tx = await this._upkeepContract.performUpkeep(performData, {
           gasLimit: this._options.gasLimit
         });
         await tx.wait();
         this._processedLogs.add(logId);
+        console.log(`[LogTriggerJob - ${this._options.name}] Upkeep performed!`);
       }
     } catch (err) {
       console.error(
