@@ -10,8 +10,6 @@ const CustomLogicABI = [
 const CombinedLogAutomationABI = [
   // Modern ILogAutomation with the full 8-field tuple
   "function checkLog((uint256 index,uint256 timestamp,bytes32 txHash,uint256 blockNumber,bytes32 blockHash,address source,bytes32[] topics,bytes data) log, bytes checkData) external view returns (bool upkeepNeeded, bytes performData)",
-  // Legacy AutomationCompatibleInterface
-  "function checkUpkeep(bytes calldata checkData) external view returns (bool upkeepNeeded, bytes memory performData)",
   // Common
   "function performUpkeep(bytes calldata performData) external",
 ];
@@ -109,17 +107,6 @@ function topic0FromSignature(sig: string): string {
     return ethers.utils.hexZeroPad(ethers.utils.hexlify(bn), 32);
   }
 
-  type CheckLogReturn =
-  | { upkeepNeeded: boolean; performData: string }
-  | [boolean, string];
-
-function unpackCheckLog(ret: CheckLogReturn): { upkeepNeeded: boolean; performData: string } {
-  if (Array.isArray(ret)) {
-    return { upkeepNeeded: ret[0], performData: ret[1] };
-  }
-  return ret;
-}
-
 export class LogTriggerJob {
   private _upkeepContract: Contract;
   private _signer: ethers.Signer;
@@ -179,36 +166,24 @@ export class LogTriggerJob {
         data: log.data
       };
 
-      // Prefer checkLog, fallback to checkUpkeep
       let upkeepNeeded = false;
       let performData = '0x';
 
       try {
+        type CheckLogObj = { upkeepNeeded?: boolean; performData?: string } & [boolean, string];
+
         const ret = (await this._upkeepContract.callStatic.checkLog(
           logStruct,
           '0x'
-        )) as CheckLogReturn;
+        )) as CheckLogObj;
+        
+        const needed = ret.upkeepNeeded ?? ret[0];
+        const pData  = ret.performData  ?? ret[1];
 
-        ({ upkeepNeeded, performData } = unpackCheckLog(ret));
+        upkeepNeeded = Boolean(needed);
+        performData  = typeof pData === 'string' ? pData : '0x';
       } catch (e) {
-        const err = e as { code?: string; message?: string };
-        const msg = (err.message ?? '').toLowerCase();
-
-        if (err.code === 'INVALID_ARGUMENT' || msg.includes('checklog')) {
-          const checkData = ethers.utils.defaultAbiCoder.encode(
-            ['bytes32[]', 'bytes'],
-            [log.topics, log.data]
-          );
-
-          const [needed, pdata] = (await this._upkeepContract.callStatic.checkUpkeep(
-            checkData
-          )) as [boolean, string];
-
-          upkeepNeeded = needed;
-          performData = pdata;
-        } else {
-          throw e;
-        }
+        throw e;
       }
 
       if (upkeepNeeded) {
