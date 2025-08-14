@@ -1,6 +1,6 @@
 {
   "name": "cartesi-chainlink-lib",
-  "version": "1.0.5",
+  "version": "1.1.0",
   "license": "MIT",
   "description": "The essential toolkit for integrating Chainlink services with the Cartesi ecosystem, starting with Chainlink Automation.",
   "type": "module",

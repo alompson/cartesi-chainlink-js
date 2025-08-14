@@ -48,6 +48,27 @@ interface UpkeepFundArgs {
   privateKey: string;
 }
 
+interface UpkeepPauseArgs {
+  upkeepId: string;
+  network?: string;
+  rpcUrl: string;
+  privateKey: string;
+}
+
+interface UpkeepUnpauseArgs {
+  upkeepId: string;
+  network?: string;
+  rpcUrl: string;
+  privateKey: string;
+}
+
+interface UpkeepCancelArgs {
+  upkeepId: string;
+  network?: string;
+  rpcUrl: string;
+  privateKey: string;
+}
+
 // Network configurations for common networks
 const NETWORK_CONFIGS: Record<string, { chainId: number; rpcUrl: string; mode: 'local' | 'chainlink' }> = {
   local: { chainId: 31337, rpcUrl: 'http://127.0.0.1:8545', mode: 'local' },
@@ -282,6 +303,95 @@ async function handleUpkeepFund(args: UpkeepFundArgs): Promise<void> {
   }
 }
 
+async function handleUpkeepPause(args: UpkeepPauseArgs): Promise<void> {
+  try {
+    const { upkeepId, network, privateKey } = args;
+    const networkConfig = getNetworkConfig(network, args.rpcUrl);
+
+    if (networkConfig.mode === 'local') {
+      console.log(`ℹ️  Local mode upkeeps don't need to be paused - use cancel instead`);
+      return;
+    }
+
+    const provider = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    const automation = new Automation({
+      signer: wallet,
+      chainId: networkConfig.chainId,
+      mode: networkConfig.mode
+    });
+
+    console.log(`⏸️  Pausing upkeep ${upkeepId}...`);
+    
+    await automation.pauseUpkeep(upkeepId);
+    
+    console.log(`✅ Upkeep paused successfully!`);
+
+  } catch (error) {
+    console.error(`❌ Error pausing upkeep: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+async function handleUpkeepUnpause(args: UpkeepUnpauseArgs): Promise<void> {
+  try {
+    const { upkeepId, network, privateKey } = args;
+    const networkConfig = getNetworkConfig(network, args.rpcUrl);
+
+    if (networkConfig.mode === 'local') {
+      console.log(`ℹ️  Local mode upkeeps don't need to be unpaused`);
+      return;
+    }
+
+    const provider = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    const automation = new Automation({
+      signer: wallet,
+      chainId: networkConfig.chainId,
+      mode: networkConfig.mode
+    });
+
+    console.log(`▶️  Resuming upkeep ${upkeepId}...`);
+    
+    await automation.unpauseUpkeep(upkeepId);
+    
+    console.log(`✅ Upkeep resumed successfully!`);
+
+  } catch (error) {
+    console.error(`❌ Error resuming upkeep: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+async function handleUpkeepCancel(args: UpkeepCancelArgs): Promise<void> {
+  try {
+    const { upkeepId, network, privateKey } = args;
+    const networkConfig = getNetworkConfig(network, args.rpcUrl);
+
+    const provider = new ethers.providers.JsonRpcProvider(networkConfig.rpcUrl);
+    const wallet = new ethers.Wallet(privateKey, provider);
+    
+    const automation = new Automation({
+      signer: wallet,
+      chainId: networkConfig.chainId,
+      mode: networkConfig.mode
+    });
+
+    console.log(`🗑️  Canceling upkeep ${upkeepId}...`);
+    console.log(`⚠️  Warning: This action is permanent and cannot be undone!`);
+    
+    await automation.cancelUpkeep(upkeepId);
+    
+    console.log(`✅ Upkeep canceled successfully!`);
+
+  } catch (error) {
+    console.error(`❌ Error canceling upkeep: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
 function findStateFiles(dir: string): string[] {
   const files: string[] = [];
   
@@ -488,6 +598,99 @@ export function upkeepCommands(yargs: Argv): Argv {
           },
           async (args) => {
             await handleUpkeepFund(args as UpkeepFundArgs);
+          }
+        )
+        .command(
+          'pause <upkeep-id>',
+          'Pause an upkeep (temporarily stop execution)',
+          (yargs) => {
+            return yargs
+              .positional('upkeep-id', {
+                describe: 'Upkeep ID to pause',
+                type: 'string',
+                demandOption: true
+              })
+              .option('network', {
+                alias: 'n',
+                describe: 'Network name',
+                type: 'string'
+              })
+              .option('rpc-url', {
+                alias: 'r',
+                describe: 'RPC URL',
+                type: 'string'
+              })
+              .option('private-key', {
+                alias: 'k',
+                describe: 'Private key for wallet',
+                type: 'string',
+                demandOption: true
+              });
+          },
+          async (args) => {
+            await handleUpkeepPause(args as UpkeepPauseArgs);
+          }
+        )
+        .command(
+          'unpause <upkeep-id>',
+          'Unpause an upkeep (resume execution)',
+          (yargs) => {
+            return yargs
+              .positional('upkeep-id', {
+                describe: 'Upkeep ID to unpause',
+                type: 'string',
+                demandOption: true
+              })
+              .option('network', {
+                alias: 'n',
+                describe: 'Network name',
+                type: 'string'
+              })
+              .option('rpc-url', {
+                alias: 'r',
+                describe: 'RPC URL',
+                type: 'string'
+              })
+              .option('private-key', {
+                alias: 'k',
+                describe: 'Private key for wallet',
+                type: 'string',
+                demandOption: true
+              });
+          },
+          async (args) => {
+            await handleUpkeepUnpause(args as UpkeepUnpauseArgs);
+          }
+        )
+        .command(
+          'cancel <upkeep-id>',
+          'Cancel an upkeep permanently (cannot be undone)',
+          (yargs) => {
+            return yargs
+              .positional('upkeep-id', {
+                describe: 'Upkeep ID to cancel',
+                type: 'string',
+                demandOption: true
+              })
+              .option('network', {
+                alias: 'n',
+                describe: 'Network name',
+                type: 'string'
+              })
+              .option('rpc-url', {
+                alias: 'r',
+                describe: 'RPC URL',
+                type: 'string'
+              })
+              .option('private-key', {
+                alias: 'k',
+                describe: 'Private key for wallet',
+                type: 'string',
+                demandOption: true
+              });
+          },
+          async (args) => {
+            await handleUpkeepCancel(args as UpkeepCancelArgs);
           }
         )
         .demandCommand(1, 'Please specify an upkeep command')
