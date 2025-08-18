@@ -2,6 +2,8 @@
 
 A comprehensive TypeScript library and CLI toolkit for integrating Chainlink Automation with Cartesi dApps, featuring a powerful local simulator for seamless development and testing.
 
+Full presentation for Cartesi Grant: https://drive.google.com/drive/folders/1x_F99vyokLng81cPk3prlvkkJURzFivn?usp=sharing
+
 ## 🚀 Overview
 
 This library provides everything you need to work with Chainlink Automation:
